@@ -12,10 +12,10 @@ func getImportCmd() *cobra.Command {
 	res := &cobra.Command{
 		Use:   "import",
 		Short: "import media to the library",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			source := args[0]
-			//dest := args[1]
+			dest := args[1]
 
 			et, err := exiftool.NewExiftool()
 			if err != nil {
@@ -25,7 +25,7 @@ func getImportCmd() *cobra.Command {
 			pw := progress.NewWriter()
 			go pw.Render()
 
-			// 1. Building file list
+			// 1. List files
 
 			tracker := &progress.Tracker{
 				Message: "Building file list",
@@ -40,20 +40,7 @@ func getImportCmd() *cobra.Command {
 
 			tracker.MarkAsDone()
 
-			// 2. Get extension info
-
-			tracker = &progress.Tracker{
-				Message: "Set tags info",
-				Total:   int64(len(infos)),
-			}
-
-			pw.AppendTracker(tracker)
-
-			dir.GetTagsInfo(infos, tracker.Increment)
-
-			tracker.MarkAsDone()
-
-			// 3. Get exif info
+			// 2. Get exif info
 
 			tracker = &progress.Tracker{
 				Message: "Getting exif info",
@@ -69,7 +56,7 @@ func getImportCmd() *cobra.Command {
 
 			tracker.MarkAsDone()
 
-			// 4. Get hash info
+			// 4. Compute hash
 
 			tracker = &progress.Tracker{
 				Message: "Getting hash info",
@@ -85,8 +72,21 @@ func getImportCmd() *cobra.Command {
 
 			tracker.MarkAsDone()
 
+			// 5. Copy files
+
+			tracker = &progress.Tracker{
+				Message: "Copying files",
+				Total:   int64(len(infos)),
+			}
+
+			pw.AppendTracker(tracker)
+
+			err = dir.CopyFiles(infos, dest, tracker.Increment)
+
 			time.Sleep(1 * time.Second) // to see the progress bar
 			pw.Stop()
+
+			cmd.Println("Done")
 
 			// produce some output
 

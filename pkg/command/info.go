@@ -21,9 +21,7 @@ func getInfoCmd() *cobra.Command {
 
 			info := file.NewInfo(target, 0)
 
-			info.GetTagsInfo()
-
-			err = info.GetExifInfo(et)
+			err = info.GetExifInfo(et, true)
 			if err != nil {
 				return err
 			}

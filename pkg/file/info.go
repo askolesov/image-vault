@@ -10,7 +10,6 @@ type Info struct {
 	Size      int64  `json:"size"`
 	Extension string `json:"extension"`
 
-	TagsInfo *TagsInfo `json:"tags_info"`
 	ExifInfo *ExifInfo `json:"exif_info"`
 	HashInfo *HashInfo `json:"hash_info"`
 }
