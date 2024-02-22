@@ -81,7 +81,16 @@ func getImportCmd() *cobra.Command {
 
 			pw.AppendTracker(tracker)
 
-			err = dir.CopyFiles(infos, dest, tracker.Increment)
+			err = dir.CopyFiles(infos, dest, func(s string) {
+				pw.Log(s)
+			}, tracker.Increment)
+			if err != nil {
+				return err
+			}
+
+			tracker.MarkAsDone()
+
+			// 6. Done
 
 			time.Sleep(1 * time.Second) // to see the progress bar
 			pw.Stop()

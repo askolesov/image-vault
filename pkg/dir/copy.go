@@ -4,9 +4,9 @@ import (
 	"img-lab/pkg/file"
 )
 
-func CopyFiles(files []*file.Info, libPath string, progressCb func(value int64)) error {
+func CopyFiles(files []*file.Info, libPath string, log func(string), progressCb func(value int64)) error {
 	for _, f := range files {
-		err := f.Copy(libPath)
+		err := f.Copy(libPath, log)
 		if err != nil {
 			return err
 		}

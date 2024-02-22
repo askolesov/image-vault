@@ -46,22 +46,22 @@ func (i *Info) GetExifInfo(et *exiftool.Exiftool, debug bool) error {
 }
 
 func GetCameraMake(m exiftool.FileMetadata) string {
-	result := GetVal(m, []string{"Make", "DeviceManufacturer"}, "Unknown Make")
+	result := GetVal(m, []string{"Make", "DeviceManufacturer"}, "NoMake")
 	return NormalizeVal(result, []string{"Sony"})
 }
 
 func GetCameraModel(m exiftool.FileMetadata) string {
-	result := GetVal(m, []string{"Model", "DeviceModelName"}, "Unknown Model")
+	result := GetVal(m, []string{"Model", "DeviceModelName"}, "NoModel")
 	return NormalizeVal(result, []string{"ILCE-6300"})
 }
 
 func GetCameraSerial(m exiftool.FileMetadata) string {
-	result := GetVal(m, []string{"SerialNumber", "DeviceSerialNo", "InternalSerialNumber"}, "Unknown Serial Number")
+	result := GetVal(m, []string{"SerialNumber", "DeviceSerialNo"}, "NoSerial")
 	return NormalizeVal(result, []string{})
 }
 
 func GetMimeType(m exiftool.FileMetadata) string {
-	result := GetVal(m, []string{"MIMEType"}, "Unknown MIME Type")
+	result := GetVal(m, []string{"MIMEType"}, "NoMIME")
 
 	// take part before the slash
 	parts := strings.Split(result, "/")

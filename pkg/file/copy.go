@@ -6,26 +6,33 @@ import (
 	"path"
 )
 
-func (i *Info) Copy(libPath string) error {
+func (i *Info) Copy(libPath string, log func(string)) error {
 	inLibPath := i.GetInLibPath()
 	targetPath := path.Join(libPath, inLibPath)
 
 	// check if file already exists
 	if targetInfo, err := os.Stat(targetPath); err == nil {
 		if targetInfo.Size() != i.Size {
-			println("File already exists, but is different size, removing: " + targetPath)
-
+			log("Overwriting " + i.Path + " to " + targetPath)
 			// remove target file if it's smaller than source
 			err = os.Remove(targetPath)
 			if err != nil {
 				return err
 			}
 		} else {
-			println("File already exists, keeping: " + targetPath)
+			log("Skipping " + i.Path + " to " + targetPath)
 
 			// skip if target file is the same size
 			return nil
 		}
+	}
+
+	log("Copying " + i.Path + " to " + targetPath)
+
+	//create directory
+	err := os.MkdirAll(path.Dir(targetPath), os.ModePerm)
+	if err != nil {
+		return err
 	}
 
 	// copy file
