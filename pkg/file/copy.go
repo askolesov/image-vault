@@ -1,8 +1,8 @@
 package file
 
 import (
+	"github.com/askolesov/img-lab/pkg/util"
 	"github.com/barasher/go-exiftool"
-	"img-lab/pkg/util"
 	"path"
 )
 

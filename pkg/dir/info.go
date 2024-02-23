@@ -1,7 +1,7 @@
 package dir
 
 import (
-	"img-lab/pkg/file"
+	"github.com/askolesov/img-lab/pkg/file"
 	"os"
 	"path/filepath"
 )

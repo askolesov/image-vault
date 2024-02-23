@@ -1,10 +1,10 @@
 package command
 
 import (
+	"github.com/askolesov/img-lab/pkg/dir"
 	"github.com/barasher/go-exiftool"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/spf13/cobra"
-	"img-lab/pkg/dir"
 	"math/rand"
 	"time"
 )

@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"img-lab/pkg/command"
+	"github.com/askolesov/img-lab/pkg/command"
 	"os"
 )
 

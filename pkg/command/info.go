@@ -2,9 +2,9 @@ package command
 
 import (
 	"encoding/json"
+	"github.com/askolesov/img-lab/pkg/file"
 	"github.com/barasher/go-exiftool"
 	"github.com/spf13/cobra"
-	"img-lab/pkg/file"
 )
 
 func getInfoCmd() *cobra.Command {
