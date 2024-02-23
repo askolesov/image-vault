@@ -26,10 +26,10 @@ jobs:
     - name: Test
       run: go test -v ./...
 
-    - name: Run GoReleaser
+    - name: Release
       uses: goreleaser/goreleaser-action@v2
       with:
         version: latest
-        args: release --rm-dist
+        args: release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
