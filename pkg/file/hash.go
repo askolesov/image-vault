@@ -10,7 +10,9 @@ type HashInfo struct {
 	ShortHash string `json:"short_hash"`
 }
 
-func (i *Info) GetHashInfo() error {
+func (i *Info) GetHashInfo(log func(string, ...any)) error {
+	log("Hashing " + i.Path)
+
 	hash, err := util.Md5HashOfFile(i.Path)
 	if err != nil {
 		return err

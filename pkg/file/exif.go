@@ -42,22 +42,25 @@ func (i *Info) GetExifInfo(et *exiftool.Exiftool, debug bool) error {
 		DateTaken: GetDateTime(metadata),
 	}
 
+	if newMake, ok := DefaultConfig.CameraModelToMakeRemap[i.ExifInfo.CameraModel]; ok {
+		i.ExifInfo.CameraMake = newMake
+	}
+
 	return nil
 }
 
 func GetCameraMake(m exiftool.FileMetadata) string {
 	result := GetVal(m, []string{"Make", "DeviceManufacturer"}, "NoMake")
-	return NormalizeVal(result, []string{"Sony"})
+	return RemapVal(result, DefaultConfig.CameraMakeRemap)
 }
 
 func GetCameraModel(m exiftool.FileMetadata) string {
 	result := GetVal(m, []string{"Model", "DeviceModelName"}, "NoModel")
-	return NormalizeVal(result, []string{"ILCE-6300"})
+	return RemapVal(result, DefaultConfig.CameraModelRemap)
 }
 
 func GetCameraSerial(m exiftool.FileMetadata) string {
-	result := GetVal(m, []string{"SerialNumber", "DeviceSerialNo"}, "NoSerial")
-	return NormalizeVal(result, []string{})
+	return GetVal(m, []string{"SerialNumber", "DeviceSerialNo"}, "NoSerial")
 }
 
 func GetMimeType(m exiftool.FileMetadata) string {
@@ -105,12 +108,9 @@ func GetVal(m exiftool.FileMetadata, tags []string, defVal string) string {
 	return result
 }
 
-func NormalizeVal(val string, templates []string) string {
-	for _, template := range templates {
-		// if lower versions equal, return template
-		if strings.ToLower(val) == strings.ToLower(template) {
-			return template
-		}
+func RemapVal(val string, templates map[string]string) string {
+	if newVal, ok := templates[val]; ok {
+		return newVal
 	}
 
 	return val

@@ -1,54 +1,54 @@
 package file
 
 import (
-	"io"
-	"os"
+	"github.com/barasher/go-exiftool"
+	"img-lab/pkg/util"
 	"path"
 )
 
-func (i *Info) Copy(libPath string, log func(string)) error {
-	inLibPath := i.GetInLibPath()
-	targetPath := path.Join(libPath, inLibPath)
+func (i *Info) Copy(et *exiftool.Exiftool, libPath string, log func(string, ...any)) error {
+	err := i.GetExifInfo(et, false) // make sure we have the exif info
+	if err != nil {
+		return err
+	}
 
-	// check if file already exists
-	if targetInfo, err := os.Stat(targetPath); err == nil {
-		if targetInfo.Size() != i.Size {
-			log("Overwriting " + i.Path + " to " + targetPath)
-			// remove target file if it's smaller than source
-			err = os.Remove(targetPath)
+	err = i.GetHashInfo(log) // make sure we have the hash info
+	if err != nil {
+		return err
+	}
+
+	if i.IsSidecar && len(i.SidecarFor) > 0 {
+		log("Copying sidecar: " + i.Path)
+
+		for _, sidecarFor := range i.SidecarFor {
+			err := sidecarFor.GetExifInfo(et, false) // make sure we have the exif info
 			if err != nil {
 				return err
 			}
-		} else {
-			log("Skipping " + i.Path + " to " + targetPath)
 
-			// skip if target file is the same size
-			return nil
+			err = sidecarFor.GetHashInfo(log) // make sure we have the hash info
+			if err != nil {
+				return err
+			}
+
+			inLibPath := sidecarFor.GetInLibPath()
+			inLibPath = util.ChangeExtension(inLibPath, i.Extension) // change extension to match sidecar
+			targetPath := path.Join(libPath, inLibPath)
+
+			err = util.SmartCopy(i.Path, targetPath, log)
+			if err != nil {
+				return err
+			}
 		}
+
+		log("Done copying sidecar: " + i.Path)
+
+		return nil
 	}
 
-	log("Copying " + i.Path + " to " + targetPath)
-
-	//create directory
-	err := os.MkdirAll(path.Dir(targetPath), os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	// copy file
-	srcFile, err := os.Open(i.Path)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
-
-	dstFile, err := os.Create(targetPath)
-	if err != nil {
-		return err
-	}
-	defer dstFile.Close()
-
-	_, err = io.Copy(dstFile, srcFile)
+	inLibPath := i.GetInLibPath()
+	targetPath := path.Join(libPath, inLibPath)
+	err = util.SmartCopy(i.Path, targetPath, log)
 	if err != nil {
 		return err
 	}
@@ -57,8 +57,7 @@ func (i *Info) Copy(libPath string, log func(string)) error {
 }
 
 func (i *Info) GetInLibPath() string {
-	camDir := i.ExifInfo.CameraMake + " - " +
-		i.ExifInfo.CameraModel + " - " + i.ExifInfo.CameraSerial + " (" + i.ExifInfo.MimeType + ")"
+	camDir := i.ExifInfo.CameraMake + " " + i.ExifInfo.CameraModel + " (" + i.ExifInfo.MimeType + ")"
 	year := i.ExifInfo.DateTaken.Format("2006")
 	date := i.ExifInfo.DateTaken.Format("2006-01-02")
 	fileName := i.ExifInfo.DateTaken.Format("2006-01-02_15-04-05") + "_" + i.HashInfo.ShortHash + i.Extension

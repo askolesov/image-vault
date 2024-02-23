@@ -5,6 +5,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/spf13/cobra"
 	"img-lab/pkg/dir"
+	"math/rand"
 	"time"
 )
 
@@ -40,39 +41,38 @@ func getImportCmd() *cobra.Command {
 
 			tracker.MarkAsDone()
 
-			// 2. Get exif info
+			// 2. Shuffle files
 
 			tracker = &progress.Tracker{
-				Message: "Getting exif info",
+				Message: "Shuffling files",
+			}
+
+			pw.AppendTracker(tracker)
+
+			rand.Shuffle(len(infos), func(i, j int) {
+				infos[i], infos[j] = infos[j], infos[i]
+				tracker.Increment(1)
+			})
+
+			tracker.MarkAsDone()
+
+			// 3. Link sidecars
+
+			tracker = &progress.Tracker{
+				Message: "Linking sidecars",
 				Total:   int64(len(infos)),
 			}
 
 			pw.AppendTracker(tracker)
 
-			err = dir.GetExifInfo(infos, et, tracker.Increment)
+			err = dir.LinkSidecars(infos, tracker.Increment)
 			if err != nil {
 				return err
 			}
 
 			tracker.MarkAsDone()
 
-			// 4. Compute hash
-
-			tracker = &progress.Tracker{
-				Message: "Getting hash info",
-				Total:   int64(len(infos)),
-			}
-
-			pw.AppendTracker(tracker)
-
-			err = dir.GetHashInfo(infos, tracker.Increment)
-			if err != nil {
-				return err
-			}
-
-			tracker.MarkAsDone()
-
-			// 5. Copy files
+			// 3. Copy files (hashing, getting exif info will be done inside)
 
 			tracker = &progress.Tracker{
 				Message: "Copying files",
@@ -81,35 +81,19 @@ func getImportCmd() *cobra.Command {
 
 			pw.AppendTracker(tracker)
 
-			err = dir.CopyFiles(infos, dest, func(s string) {
-				pw.Log(s)
-			}, tracker.Increment)
+			err = dir.CopyFiles(infos, dest, et, pw.Log, tracker.Increment)
 			if err != nil {
 				return err
 			}
 
 			tracker.MarkAsDone()
 
-			// 6. Done
+			// 4. Done
 
 			time.Sleep(1 * time.Second) // to see the progress bar
 			pw.Stop()
 
 			cmd.Println("Done")
-
-			// produce some output
-
-			//byExt := lo.CountValuesBy(infos, func(info *file.Info) string {
-			//	return info.Extension
-			//})
-			//
-			//log.Info("files by extension", zap.Any("byExt", byExt))
-			//
-			//byCategory := lo.CountValuesBy(infos, func(info *file.Info) string {
-			//	return string(info.Category)
-			//})
-			//
-			//log.Info("files by category", zap.Any("byCategory", byCategory))
 
 			return nil
 		},

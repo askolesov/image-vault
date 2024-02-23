@@ -26,17 +26,17 @@ func getInfoCmd() *cobra.Command {
 				return err
 			}
 
-			err = info.GetHashInfo()
+			err = info.GetHashInfo(cmd.Printf)
 			if err != nil {
 				return err
 			}
 
-			json, err := json.MarshalIndent(info, "", "  ")
+			infoJson, err := json.MarshalIndent(info, "", "  ")
 			if err != nil {
 				return err
 			}
 
-			cmd.Println(string(json))
+			cmd.Println(string(infoJson))
 
 			return nil
 		},
