@@ -26,5 +26,10 @@ jobs:
     - name: Test
       run: go test -v ./...
 
-    - name: Release
-      uses: PackagrIO/action-releasr-go@v1.0.1
+    - name: Run GoReleaser
+      uses: goreleaser/goreleaser-action@v2
+      with:
+        version: latest
+        args: release --rm-dist
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
