@@ -1,6 +1,7 @@
 package file
 
 import (
+	"github.com/askolesov/img-lab/pkg/config"
 	"github.com/samber/lo"
 	"path/filepath"
 	"strings"
@@ -19,12 +20,14 @@ type Info struct {
 }
 
 func NewInfo(path string, size int64) *Info {
+	// get file stats
+
 	ext := strings.ToLower(filepath.Ext(path))
 
 	return &Info{
 		Path:      path,
 		Size:      size,
 		Extension: ext,
-		IsSidecar: lo.Contains(DefaultConfig.SidecarExtensions, ext),
+		IsSidecar: lo.Contains(config.DefaultConfig.SidecarExtensions, ext),
 	}
 }

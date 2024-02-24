@@ -2,6 +2,7 @@ package file
 
 import (
 	"encoding/json"
+	"github.com/askolesov/img-lab/pkg/config"
 	"github.com/barasher/go-exiftool"
 	"strings"
 	"time"
@@ -42,7 +43,7 @@ func (i *Info) GetExifInfo(et *exiftool.Exiftool, debug bool) error {
 		DateTaken: GetDateTime(metadata),
 	}
 
-	if newMake, ok := DefaultConfig.CameraModelToMakeRemap[i.ExifInfo.CameraModel]; ok {
+	if newMake, ok := config.DefaultConfig.CameraModelToMakeRemap[i.ExifInfo.CameraModel]; ok {
 		i.ExifInfo.CameraMake = newMake
 	}
 
@@ -51,12 +52,12 @@ func (i *Info) GetExifInfo(et *exiftool.Exiftool, debug bool) error {
 
 func GetCameraMake(m exiftool.FileMetadata) string {
 	result := GetVal(m, []string{"Make", "DeviceManufacturer"}, "NoMake")
-	return RemapVal(result, DefaultConfig.CameraMakeRemap)
+	return RemapVal(result, config.DefaultConfig.CameraMakeRemap)
 }
 
 func GetCameraModel(m exiftool.FileMetadata) string {
 	result := GetVal(m, []string{"Model", "DeviceModelName"}, "NoModel")
-	return RemapVal(result, DefaultConfig.CameraModelRemap)
+	return RemapVal(result, config.DefaultConfig.CameraModelRemap)
 }
 
 func GetCameraSerial(m exiftool.FileMetadata) string {

@@ -7,6 +7,7 @@ import (
 	"path"
 )
 
+// SmartCopy copies a file from source to target if the target file does not exist or has a different size.
 func SmartCopy(source, target string, log func(string, ...any)) error {
 	// get source file info
 	sourceInfo, err := os.Stat(source)
