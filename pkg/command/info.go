@@ -2,7 +2,7 @@ package command
 
 import (
 	"encoding/json"
-	"github.com/askolesov/img-lab/pkg/file"
+	"github.com/askolesov/image-vault/pkg/file"
 	"github.com/barasher/go-exiftool"
 	"github.com/spf13/cobra"
 )

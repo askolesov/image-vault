@@ -1,7 +1,7 @@
 package dir
 
 import (
-	"github.com/askolesov/img-lab/pkg/file"
+	"github.com/askolesov/image-vault/pkg/file"
 	"github.com/barasher/go-exiftool"
 )
 

@@ -8,7 +8,7 @@ import (
 )
 
 // SmartCopy copies a file from source to target if the target file does not exist or has a different size.
-func SmartCopy(source, target string, log func(string, ...any)) error {
+func SmartCopy(source, target string, dryRun bool, log func(string, ...any)) error {
 	// get source file info
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
@@ -27,11 +27,15 @@ func SmartCopy(source, target string, log func(string, ...any)) error {
 
 		if targetInfo.Size() != sourceInfo.Size() {
 			// sizes are different, remove target file
-			log("Overwriting " + source + " to " + target)
+			if dryRun {
+				log("Dry run: would remove " + target)
+			} else {
+				log("Removing " + target)
 
-			err = os.Remove(target)
-			if err != nil {
-				return err
+				err = os.Remove(target)
+				if err != nil {
+					return err
+				}
 			}
 		} else {
 			// skip if target file is the same size
@@ -47,6 +51,11 @@ func SmartCopy(source, target string, log func(string, ...any)) error {
 	}
 
 	log("Copying " + source + " to " + target)
+
+	if dryRun {
+		log("Dry run: would copy " + source + " to " + target)
+		return nil
+	}
 
 	// create directory
 	err = os.MkdirAll(path.Dir(target), os.ModePerm)

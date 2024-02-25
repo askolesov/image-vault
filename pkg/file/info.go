@@ -1,7 +1,7 @@
 package file
 
 import (
-	"github.com/askolesov/img-lab/pkg/config"
+	"github.com/askolesov/image-vault/pkg/config"
 	"github.com/samber/lo"
 	"path/filepath"
 	"strings"

@@ -1,4 +1,0 @@
-builds:
-  - id: "img-lab"
-    main: ./cmd/img-lab/main.go
-    binary: img-lab

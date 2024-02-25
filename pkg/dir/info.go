@@ -1,16 +1,21 @@
 package dir
 
 import (
-	"github.com/askolesov/img-lab/pkg/file"
+	"github.com/askolesov/image-vault/pkg/file"
 	"os"
 	"path/filepath"
 )
 
-func Info(path string, progressCb func(int64)) ([]*file.Info, error) {
+func Info(path string, log func(string, ...any), progressCb func(int64)) ([]*file.Info, error) {
 	var res []*file.Info
 
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			if os.IsPermission(err) {
+				log("Permission denied: " + path)
+				return nil
+			}
+
 			return err
 		}
 

@@ -6,8 +6,8 @@ import (
 
 func GetRootCommand() *cobra.Command {
 	res := &cobra.Command{
-		Use:   "img-lab",
-		Short: "img-lab is a tool for managing photo libraries",
+		Use:   "image-vault",
+		Short: "image-vault is a tool for managing photo libraries",
 	}
 
 	res.AddCommand(getImportCmd())

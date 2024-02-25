@@ -13,10 +13,11 @@ type Config struct {
 	// SidecarExtensions is a list of file extensions that are considered sidecar files.
 	// Those files are copied to the library with the same name as the main file.
 	SidecarExtensions []string
+	IgnoreDirs        []string
 }
 
 type Tag struct {
-	ExifTags  []string          // list of exif tags to search for value
+	ExifTags  []string          // list of extractor tags to search for value
 	Remapping map[string]string // remap values to new values
 	Default   string            // default value if tag is not found
 }
@@ -54,4 +55,5 @@ var DefaultConfig = Config{
 	},
 
 	SidecarExtensions: []string{".xmp"},
+	IgnoreDirs:        []string{".Spotlight-V100"},
 }

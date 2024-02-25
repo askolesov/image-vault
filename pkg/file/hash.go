@@ -2,7 +2,7 @@ package file
 
 import (
 	"encoding/hex"
-	"github.com/askolesov/img-lab/pkg/util"
+	"github.com/askolesov/image-vault/pkg/util"
 )
 
 type HashInfo struct {

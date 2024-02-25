@@ -1,8 +1,8 @@
 package dir
 
 import (
-	"github.com/askolesov/img-lab/pkg/file"
-	"github.com/askolesov/img-lab/pkg/util"
+	"github.com/askolesov/image-vault/pkg/file"
+	"github.com/askolesov/image-vault/pkg/util"
 )
 
 func LinkSidecars(files []*file.Info, progressCb func(value int64)) error {

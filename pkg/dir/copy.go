@@ -1,7 +1,7 @@
 package dir
 
 import (
-	"github.com/askolesov/img-lab/pkg/file"
+	"github.com/askolesov/image-vault/pkg/file"
 	"github.com/barasher/go-exiftool"
 )
 
@@ -9,11 +9,12 @@ func CopyFiles(
 	files []*file.Info,
 	libPath string,
 	et *exiftool.Exiftool,
+	dryRun bool,
 	log func(string, ...any),
 	progressCb func(value int64),
 ) error {
 	for _, f := range files {
-		err := f.Copy(et, libPath, log)
+		err := f.Copy(et, libPath, dryRun, log)
 		if err != nil {
 			return err
 		}

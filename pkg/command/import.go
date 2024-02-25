@@ -1,7 +1,7 @@
 package command
 
 import (
-	"github.com/askolesov/img-lab/pkg/dir"
+	"github.com/askolesov/image-vault/pkg/dir"
 	"github.com/barasher/go-exiftool"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/spf13/cobra"
@@ -10,6 +10,8 @@ import (
 )
 
 func getImportCmd() *cobra.Command {
+	var dryRun bool
+
 	res := &cobra.Command{
 		Use:   "import",
 		Short: "import media to the library",
@@ -34,7 +36,7 @@ func getImportCmd() *cobra.Command {
 
 			pw.AppendTracker(tracker)
 
-			infos, err := dir.Info(source, tracker.Increment)
+			infos, err := dir.Info(source, cmd.Printf, tracker.Increment)
 			if err != nil {
 				return err
 			}
@@ -72,7 +74,7 @@ func getImportCmd() *cobra.Command {
 
 			tracker.MarkAsDone()
 
-			// 3. Copy files (hashing, getting exif info will be done inside)
+			// 3. Copy files (hashing, getting extractor info will be done inside)
 
 			tracker = &progress.Tracker{
 				Message: "Copying files",
@@ -81,7 +83,7 @@ func getImportCmd() *cobra.Command {
 
 			pw.AppendTracker(tracker)
 
-			err = dir.CopyFiles(infos, dest, et, pw.Log, tracker.Increment)
+			err = dir.CopyFiles(infos, dest, et, dryRun, pw.Log, tracker.Increment)
 			if err != nil {
 				return err
 			}
@@ -98,6 +100,8 @@ func getImportCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	res.Flags().BoolVar(&dryRun, "dry-run", false, "dry run")
 
 	return res
 }

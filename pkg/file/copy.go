@@ -1,13 +1,13 @@
 package file
 
 import (
-	"github.com/askolesov/img-lab/pkg/util"
+	"github.com/askolesov/image-vault/pkg/util"
 	"github.com/barasher/go-exiftool"
 	"path"
 )
 
-func (i *Info) Copy(et *exiftool.Exiftool, libPath string, log func(string, ...any)) error {
-	err := i.GetExifInfo(et, false) // make sure we have the exif info
+func (i *Info) Copy(et *exiftool.Exiftool, libPath string, dryRun bool, log func(string, ...any)) error {
+	err := i.GetExifInfo(et, false) // make sure we have the extractor info
 	if err != nil {
 		return err
 	}
@@ -21,7 +21,7 @@ func (i *Info) Copy(et *exiftool.Exiftool, libPath string, log func(string, ...a
 		log("Copying sidecar: " + i.Path)
 
 		for _, sidecarFor := range i.SidecarFor {
-			err := sidecarFor.GetExifInfo(et, false) // make sure we have the exif info
+			err := sidecarFor.GetExifInfo(et, false) // make sure we have the extractor info
 			if err != nil {
 				return err
 			}
@@ -35,7 +35,7 @@ func (i *Info) Copy(et *exiftool.Exiftool, libPath string, log func(string, ...a
 			inLibPath = util.ChangeExtension(inLibPath, i.Extension) // change extension to match sidecar
 			targetPath := path.Join(libPath, inLibPath)
 
-			err = util.SmartCopy(i.Path, targetPath, log)
+			err = util.SmartCopy(i.Path, targetPath, dryRun, log)
 			if err != nil {
 				return err
 			}
@@ -48,7 +48,7 @@ func (i *Info) Copy(et *exiftool.Exiftool, libPath string, log func(string, ...a
 
 	inLibPath := i.GetInLibPath()
 	targetPath := path.Join(libPath, inLibPath)
-	err = util.SmartCopy(i.Path, targetPath, log)
+	err = util.SmartCopy(i.Path, targetPath, dryRun, log)
 	if err != nil {
 		return err
 	}

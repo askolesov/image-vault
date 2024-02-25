@@ -1,4 +1,4 @@
-module github.com/askolesov/img-lab
+module github.com/askolesov/image-vault
 
 go 1.21
 
