@@ -17,43 +17,81 @@ func TestExtractMetadata(t *testing.T) {
 	cfg := &Config{
 		Fields: []Field{
 			{ // simple field
-				Name:         "width",
-				SourceFields: []string{"ImageWidth"},
+				Name: "width",
+				Exif: Exif{
+					SourceFields: []string{"ImageWidth"},
+				},
 			},
 			{ // field with default
-				Name:         "non_existent",
-				SourceFields: []string{"NonExistent"},
-				Default:      "default",
+				Name: "non_existent",
+				Exif: Exif{
+					SourceFields: []string{"NonExistent"},
+					Default:      "default",
+				},
 			},
 			{ // field with replace
-				Name:         "model",
-				SourceFields: []string{"Model"},
-				Replace: map[string]string{
-					"Canon EOS 550D": "my favorite camera",
+				Name: "model",
+				Exif: Exif{
+					SourceFields: []string{"Model"},
+					Replace: map[string]string{
+						"Canon EOS 550D": "my favorite camera",
+					},
 				},
 			},
 			{ // field with date
-				Name:         "date",
-				SourceFields: []string{"non existent label", "DateTimeOriginal"},
-				Date: Date{
-					ParseTemplate:  "2006:01:02 15:04:05",
-					FormatTemplate: time.RFC3339,
+				Name: "date",
+				Exif: Exif{
+					SourceFields: []string{"non existent label", "DateTimeOriginal"},
+					Date: Date{
+						ParseTemplate:  "2006:01:02 15:04:05",
+						FormatTemplate: time.RFC3339,
+					},
 				},
 			},
 			{
-				Name:         "date_custom",
-				SourceFields: []string{"DateTimeOriginal"},
-				Date: Date{
-					ParseTemplate:  "2006:01:02 15:04:05",
-					FormatTemplate: "2006-01-02_15-04-05",
+				Name: "date_custom",
+				Exif: Exif{
+					SourceFields: []string{"DateTimeOriginal"},
+					Date: Date{
+						ParseTemplate:  "2006:01:02 15:04:05",
+						FormatTemplate: "2006-01-02_15-04-05",
+					},
 				},
 			},
 			{
-				Name:         "year",
-				SourceFields: []string{"DateTimeOriginal"},
-				Date: Date{
-					ParseTemplate:  "2006:01:02 15:04:05",
-					FormatTemplate: "2006",
+				Name: "year",
+				Exif: Exif{
+					SourceFields: []string{"DateTimeOriginal"},
+					Date: Date{
+						ParseTemplate:  "2006:01:02 15:04:05",
+						FormatTemplate: "2006",
+					},
+				},
+			},
+			{
+				Name: "md5_full",
+				Hash: Hash{
+					Md5: true,
+				},
+			},
+			{
+				Name: "sha1_full",
+				Hash: Hash{
+					Sha1: true,
+				},
+			},
+			{
+				Name: "md5_partial",
+				Hash: Hash{
+					Md5:        true,
+					FirstBytes: 4,
+				},
+			},
+			{
+				Name: "sha1_partial",
+				Hash: Hash{
+					Sha1:       true,
+					FirstBytes: 4,
 				},
 			},
 		},
@@ -79,4 +117,8 @@ func TestExtractMetadata(t *testing.T) {
 	require.Equal(t, "2019-12-30T18:41:17Z", labels["date"])
 	require.Equal(t, "2019-12-30_18-41-17", labels["date_custom"])
 	require.Equal(t, "2019", labels["year"])
+	require.Equal(t, "afe871148dc094b05195c3b232e1d90f", labels["md5_full"])
+	require.Equal(t, "efdbe4b99dd5c1b5fd97e532c2c4d8431bb47c5d", labels["sha1_full"])
+	require.Equal(t, "afe87114", labels["md5_partial"])
+	require.Equal(t, "efdbe4b9", labels["sha1_partial"])
 }

@@ -1,7 +1,9 @@
 package extractor
 
 import (
+	"encoding/hex"
 	"github.com/barasher/go-exiftool"
+	"github.com/samber/lo"
 	"time"
 )
 
@@ -18,29 +20,37 @@ func NewService(cfg *Config, et *exiftool.Exiftool) *Service {
 }
 
 func (s *Service) Extract(path string) (map[string]string, error) {
-	fms := s.et.ExtractMetadata(path)
-	if len(fms) != 1 {
-		panic("should not happen")
-	}
+	exifNeeded := lo.SomeBy(s.cfg.Fields, func(f Field) bool { return f.Exif.IsSet() })
+	md5Needed := lo.SomeBy(s.cfg.Fields, func(f Field) bool { return f.Hash.Md5 })
+	sha1Needed := lo.SomeBy(s.cfg.Fields, func(f Field) bool { return f.Hash.Sha1 })
 
-	fm := fms[0]
-	if fm.Err != nil {
-		return nil, fm.Err
+	// 1. Get raw metadata
+	rawMetadata, err := getRawMetadata(s.et, path, exifNeeded, md5Needed, sha1Needed)
+	if err != nil {
+		return nil, err
 	}
 
 	res := make(map[string]string)
 
-	// extract fields
+	// 2. Compute field values
 	for _, cfgField := range s.cfg.Fields {
-		val, err := s.extractField(fm, cfgField)
+		var val string
+		var err error
+
+		switch {
+		case cfgField.Exif.IsSet():
+			val, err = s.extractExifField(rawMetadata.Exif, cfgField.Exif)
+		case cfgField.Hash.IsSet():
+			val = extractHashField(rawMetadata.Hash, cfgField.Hash)
+		}
+
 		if err != nil {
 			return nil, err
 		}
-
 		res[cfgField.Name] = val
 	}
 
-	// apply cross-field replacements
+	// 3. Apply cross-field replacements
 	for _, replace := range s.cfg.Replace {
 		if val, ok := res[replace.SourceField]; ok && val == replace.ValueEquals {
 			res[replace.TargetField] = replace.SetValue
@@ -50,11 +60,11 @@ func (s *Service) Extract(path string) (map[string]string, error) {
 	return res, nil
 }
 
-func (s *Service) extractField(fm exiftool.FileMetadata, cfgField Field) (string, error) {
+func (s *Service) extractExifField(fm exiftool.FileMetadata, cfg Exif) (string, error) {
 	var val string
 
 	// extract
-	for _, sourceField := range cfgField.SourceFields {
+	for _, sourceField := range cfg.SourceFields {
 		if v, err := fm.GetString(sourceField); err == nil && v != "" {
 			val = v
 			break
@@ -63,31 +73,52 @@ func (s *Service) extractField(fm exiftool.FileMetadata, cfgField Field) (string
 
 	// apply default
 	if val == "" {
-		val = cfgField.Default
+		val = cfg.Default
 	}
 
 	// replace
-	if replace, ok := cfgField.Replace[val]; ok {
+	if replace, ok := cfg.Replace[val]; ok {
 		val = replace
 	}
 
 	// type specific transformations
-	val = applyDateTransformations(val, cfgField.Date)
+	if cfg.Date.IsSet() {
+		val = applyDateTransformations(val, cfg.Date)
+	}
 
 	return val, nil
 }
 
-func applyDateTransformations(val string, cfgDate Date) string {
-	if cfgDate.ParseTemplate == "" {
-		return val
-	}
-
-	t, err := time.Parse(cfgDate.ParseTemplate, val)
+func applyDateTransformations(val string, cfg Date) string {
+	t, err := time.Parse(cfg.ParseTemplate, val)
 	if err != nil {
 		t = time.Unix(0, 0).UTC()
 	}
 
-	val = t.Format(cfgDate.FormatTemplate)
+	val = t.Format(cfg.FormatTemplate)
 
 	return val
+}
+
+func extractHashField(fm RawHashInfo, cfg Hash) string {
+	var hash []byte
+
+	if cfg.Md5 {
+		hash = fm.Md5
+	}
+
+	if cfg.Sha1 {
+		hash = fm.Sha1
+	}
+
+	// just in case
+	if cfg.FirstBytes < 0 {
+		cfg.FirstBytes = 0
+	}
+
+	if cfg.FirstBytes > 0 && cfg.FirstBytes <= len(hash) {
+		hash = hash[:cfg.FirstBytes]
+	}
+
+	return hex.EncodeToString(hash)
 }
