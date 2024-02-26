@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"github.com/askolesov/image-vault/pkg/file"
 	"github.com/askolesov/image-vault/pkg/util"
 	"github.com/askolesov/image-vault/pkg2/types"
 	"github.com/samber/lo"
@@ -38,22 +37,32 @@ func (s *Service) Scan(path string, progressCb types.CallbackFn) ([]*FileInfo, e
 func (s *Service) buildFileList(path string, progressCb types.CallbackFn) ([]*FileInfo, error) {
 	var res []*FileInfo
 
+	// build indexes for faster lookups
 	skip := lo.Associate(s.cfg.Skip, func(item string) (string, any) {
+		return item, true
+	})
+
+	sidecarExts := lo.Associate(s.cfg.SidecarExtensions, func(item string) (string, any) {
 		return item, true
 	})
 
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			if os.IsPermission(err) {
-				s.log("Permission denied: " + path)
+			if os.IsPermission(err) && s.cfg.SkipPermissionDenied {
+				s.log("Skipping permission denied: " + path)
+				return nil
 			}
 
 			return err
 		}
 
-		// check if the file or dir should be skipped
-		_, skip := skip[filepath.Base(path)]
+		base := filepath.Base(path)
+
+		// skip ignored files
+		_, skip := skip[base]
 		if skip {
+			s.log("Skipping: " + path)
+
 			if info.IsDir() {
 				return filepath.SkipDir
 			} else {
@@ -61,13 +70,25 @@ func (s *Service) buildFileList(path string, progressCb types.CallbackFn) ([]*Fi
 			}
 		}
 
+		// skip hidden files
+		if s.cfg.SkipHidden && len(base) > 1 && base[0] == '.' {
+			s.log("Skipping hidden: " + path)
+			return nil
+		}
+
 		// skip directories
 		if info.IsDir() {
 			return nil
 		}
 
-		// add file to the list
-		res = append(res, &FileInfo{Path: path})
+		// check if the file is a sidecar
+		_, isSidecar := sidecarExts[filepath.Ext(path)]
+
+		// add remaining files to the result
+		res = append(res, &FileInfo{
+			Path:      path,
+			IsSidecar: isSidecar,
+		})
 
 		progressCb(1)
 
@@ -82,30 +103,21 @@ func (s *Service) buildFileList(path string, progressCb types.CallbackFn) ([]*Fi
 }
 
 func (s *Service) linkSidecars(files []*FileInfo) error {
-	nonSidecarsByPathWithoutExt := make(map[string][]*FileInfo)
-
 	// aggregate non-sidecar files by path without extension
-	for _, f := range files {
-		if f.IsSidecar {
-			continue
-		}
+	nonSidecars := lo.Filter(files, func(f *FileInfo, _ int) bool {
+		return !f.IsSidecar
+	})
 
-		pathWithoutExt := util.GetPathWithoutExtension(f.Path)
-		if _, ok := nonSidecarsByPathWithoutExt[pathWithoutExt]; !ok {
-			nonSidecarsByPathWithoutExt[pathWithoutExt] = make([]*file.Info, 0)
-		}
-
-		nonSidecarsByPathWithoutExt[pathWithoutExt] = append(nonSidecarsByPathWithoutExt[pathWithoutExt], f)
-	}
+	nonSidecarsByPathWithoutExt := lo.GroupBy(nonSidecars, func(f *FileInfo) string {
+		return util.GetPathWithoutExtension(f.Path)
+	})
 
 	// iterate over sidecar files and link them to their non-sidecar counterparts
-	for _, f := range files {
-		progressCb(1)
+	sidecars := lo.Filter(files, func(f *FileInfo, _ int) bool {
+		return f.IsSidecar
+	})
 
-		if !f.IsSidecar {
-			continue
-		}
-
+	for _, f := range sidecars {
 		pathWithoutExt := util.GetPathWithoutExtension(f.Path)
 		if sidecarFor, ok := nonSidecarsByPathWithoutExt[pathWithoutExt]; ok {
 			f.SidecarFor = sidecarFor
