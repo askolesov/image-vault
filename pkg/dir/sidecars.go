@@ -2,7 +2,7 @@ package dir
 
 import (
 	"github.com/askolesov/image-vault/pkg/file"
-	"github.com/askolesov/image-vault/pkg/util"
+	"github.com/askolesov/image-vault/pkg2/util"
 )
 
 func LinkSidecars(files []*file.Info, progressCb func(value int64)) error {
