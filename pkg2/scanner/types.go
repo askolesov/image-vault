@@ -5,4 +5,6 @@ type FileInfo struct {
 
 	IsSidecar  bool
 	SidecarFor []*FileInfo
+
+	Fields map[string]string
 }

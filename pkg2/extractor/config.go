@@ -52,6 +52,15 @@ type Replace struct {
 	SetValue    string `mapstructure:"set_value"`
 }
 
+//func (i *Info) GetInLibPath() string {
+//	camDir := i.ExifInfo.CameraMake + " " + i.ExifInfo.CameraModel + " (" + i.ExifInfo.MimeType + ")"
+//	year := i.ExifInfo.DateTaken.Format("2006")
+//	date := i.ExifInfo.DateTaken.Format("2006-01-02")
+//	fileName := i.ExifInfo.DateTaken.Format("2006-01-02_15-04-05") + "_" + i.HashInfo.ShortHash + i.Extension
+//
+//	return path.Join(camDir, year, date, fileName)
+//}
+
 func DefaultConfig() Config {
 	return Config{
 		Fields: []Field{

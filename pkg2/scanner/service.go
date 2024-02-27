@@ -20,7 +20,7 @@ func NewService(cfg *Config, log types.LogFn) *Service {
 	}
 }
 
-func (s *Service) Scan(path string, progressCb types.CallbackFn) ([]*FileInfo, error) {
+func (s *Service) Scan(path string, progressCb types.ProgressCb) ([]*FileInfo, error) {
 	result, err := s.buildFileList(path, progressCb)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func (s *Service) Scan(path string, progressCb types.CallbackFn) ([]*FileInfo, e
 	return result, nil
 }
 
-func (s *Service) buildFileList(path string, progressCb types.CallbackFn) ([]*FileInfo, error) {
+func (s *Service) buildFileList(path string, progressCb types.ProgressCb) ([]*FileInfo, error) {
 	var res []*FileInfo
 
 	// build indexes for faster lookups

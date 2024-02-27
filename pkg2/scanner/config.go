@@ -7,3 +7,11 @@ type Config struct {
 	SkipHidden           bool     `mapstructure:"skip_hidden"`
 	SkipPermissionDenied bool     `mapstructure:"skip_permission_denied"`
 }
+
+func DefaultConfig() *Config {
+	return &Config{
+		SidecarExtensions: []string{".xmp", ".thm", ".lrv", ".mpf", ".aae", ".xml", ".json"},
+		Skip:              []string{".git", ".svn", ".hg", ".bzr", ".DS_Store", "Thumbs.db"},
+		SkipHidden:        true,
+	}
+}

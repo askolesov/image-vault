@@ -1,8 +1,8 @@
 package file
 
 import (
-	"github.com/askolesov/image-vault/pkg/util"
-	util2 "github.com/askolesov/image-vault/pkg2/util"
+	"github.com/askolesov/image-vault/pkg2/copier"
+	"github.com/askolesov/image-vault/pkg2/util"
 	"github.com/barasher/go-exiftool"
 	"path"
 )
@@ -33,10 +33,10 @@ func (i *Info) Copy(et *exiftool.Exiftool, libPath string, dryRun bool, log func
 			}
 
 			inLibPath := sidecarFor.GetInLibPath()
-			inLibPath = util2.ChangeExtension(inLibPath, i.Extension) // change extension to match sidecar
+			inLibPath = util.ChangeExtension(inLibPath, i.Extension) // change extension to match sidecar
 			targetPath := path.Join(libPath, inLibPath)
 
-			err = util.SmartCopy(i.Path, targetPath, dryRun, log)
+			err = copier.SmartCopy(i.Path, targetPath, dryRun, false, log)
 			if err != nil {
 				return err
 			}
@@ -49,7 +49,7 @@ func (i *Info) Copy(et *exiftool.Exiftool, libPath string, dryRun bool, log func
 
 	inLibPath := i.GetInLibPath()
 	targetPath := path.Join(libPath, inLibPath)
-	err = util.SmartCopy(i.Path, targetPath, dryRun, log)
+	err = copier.SmartCopy(i.Path, targetPath, dryRun, false, log)
 	if err != nil {
 		return err
 	}
