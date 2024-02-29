@@ -16,32 +16,46 @@ func TestExtractMetadata(t *testing.T) {
 
 	cfg := &Config{
 		Fields: []Field{
-			{ // simple field
+			{ // exif
 				Name: "width",
-				Exif: Exif{
-					SourceFields: []string{"ImageWidth"},
+				Source: Source{
+					Exif: Exif{
+						Fields: []string{"ImageWidth"},
+					},
 				},
 			},
-			{ // field with default
+			{ // exif with default
 				Name: "non_existent",
-				Exif: Exif{
-					SourceFields: []string{"NonExistent"},
-					Default:      "default",
+				Source: Source{
+					Exif: Exif{
+						Fields:  []string{"NonExistent"},
+						Default: "default",
+					},
 				},
 			},
 			{ // field with replace
 				Name: "model",
-				Exif: Exif{
-					SourceFields: []string{"Model"},
-					Replace: map[string]string{
-						"Canon EOS 550D": "my favorite camera",
+				Source: Source{
+					Exif: Exif{
+						Fields: []string{"Model"},
+					},
+				},
+				Transform: Transform{
+					String: String{
+						Replace: map[string]string{
+							"Canon EOS 550D": "my favorite camera",
+						},
 					},
 				},
 			},
 			{ // field with date
 				Name: "date",
-				Exif: Exif{
-					SourceFields: []string{"non existent label", "DateTimeOriginal"},
+				Source: Source{
+					Exif: Exif{
+						Fields: []string{"non existent label", "DateTimeOriginal"},
+					},
+				},
+				Transform: Transform{
 					Date: Date{
 						ParseTemplate:  "2006:01:02 15:04:05",
 						FormatTemplate: time.RFC3339,
@@ -50,8 +64,12 @@ func TestExtractMetadata(t *testing.T) {
 			},
 			{
 				Name: "date_custom",
-				Exif: Exif{
-					SourceFields: []string{"DateTimeOriginal"},
+				Source: Source{
+					Exif: Exif{
+						Fields: []string{"DateTimeOriginal"},
+					},
+				},
+				Transform: Transform{
 					Date: Date{
 						ParseTemplate:  "2006:01:02 15:04:05",
 						FormatTemplate: "2006-01-02_15-04-05",
@@ -60,8 +78,12 @@ func TestExtractMetadata(t *testing.T) {
 			},
 			{
 				Name: "year",
-				Exif: Exif{
-					SourceFields: []string{"DateTimeOriginal"},
+				Source: Source{
+					Exif: Exif{
+						Fields: []string{"DateTimeOriginal"},
+					},
+				},
+				Transform: Transform{
 					Date: Date{
 						ParseTemplate:  "2006:01:02 15:04:05",
 						FormatTemplate: "2006",
@@ -70,28 +92,73 @@ func TestExtractMetadata(t *testing.T) {
 			},
 			{
 				Name: "md5_full",
-				Hash: Hash{
-					Md5: true,
+				Source: Source{
+					Hash: Hash{
+						Md5: true,
+					},
 				},
 			},
 			{
 				Name: "sha1_full",
-				Hash: Hash{
-					Sha1: true,
+				Source: Source{
+					Hash: Hash{
+						Sha1: true,
+					},
 				},
 			},
 			{
 				Name: "md5_partial",
-				Hash: Hash{
-					Md5:        true,
-					FirstBytes: 4,
+				Source: Source{
+					Hash: Hash{
+						Md5: true,
+					},
+				},
+				Transform: Transform{
+					Binary: Binary{
+						FirstBytes: 4,
+					},
 				},
 			},
 			{
 				Name: "sha1_partial",
-				Hash: Hash{
-					Sha1:       true,
-					FirstBytes: 4,
+				Source: Source{
+					Hash: Hash{
+						Sha1: true,
+					},
+				},
+				Transform: Transform{
+					Binary: Binary{
+						FirstBytes: 4,
+					},
+				},
+			},
+			{
+				Name: "path_extension",
+				Source: Source{
+					Path: Path{
+						Extension: true,
+					},
+				},
+			},
+			{
+				Name: "base_path",
+				Source: Source{
+					Path: Path{
+						Base: true,
+					},
+				},
+			},
+			{
+				Name: "extension_upper",
+				Source: Source{
+					Path: Path{
+						Extension: true,
+					},
+				},
+				Transform: Transform{
+					String: String{
+						ToUpper: true,
+					},
 				},
 			},
 		},
@@ -121,4 +188,7 @@ func TestExtractMetadata(t *testing.T) {
 	require.Equal(t, "efdbe4b99dd5c1b5fd97e532c2c4d8431bb47c5d", labels["sha1_full"])
 	require.Equal(t, "afe87114", labels["md5_partial"])
 	require.Equal(t, "efdbe4b9", labels["sha1_partial"])
+	require.Equal(t, ".jpg", labels["path_extension"])
+	require.Equal(t, "test.jpg", labels["base_path"])
+	require.Equal(t, ".JPG", labels["extension_upper"])
 }

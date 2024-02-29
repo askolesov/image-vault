@@ -11,6 +11,7 @@ import (
 type RawMetadata struct {
 	Exif exiftool.FileMetadata
 	Hash RawHashInfo
+	Path string
 }
 
 type RawHashInfo struct {
@@ -25,7 +26,9 @@ func getRawMetadata(
 	md5Needed bool,
 	sha1Needed bool,
 ) (RawMetadata, error) {
-	res := RawMetadata{}
+	res := RawMetadata{
+		Path: path,
+	}
 
 	if exifNeeded {
 		// extract file metadata

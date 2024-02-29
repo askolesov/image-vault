@@ -6,23 +6,60 @@ type Config struct {
 }
 
 type Field struct {
-	Name string `mapstructure:"name"`
+	Name      string    `mapstructure:"name"`
+	Source    Source    `mapstructure:"source"`
+	Transform Transform `mapstructure:"transform"`
+}
 
+// Source is the source of the field
+
+type Source struct {
 	Exif Exif `mapstructure:"exif"`
 	Hash Hash `mapstructure:"hash"`
+	Path Path `mapstructure:"path"`
 }
 
 type Exif struct {
-	SourceFields []string          `mapstructure:"source_fields"`
-	Default      string            `mapstructure:"default"`
-	Replace      map[string]string `mapstructure:"replace"`
-
-	// Type specific transformations
-	Date Date `mapstructure:"date"`
+	Fields  []string `mapstructure:"fields"`
+	Default string   `mapstructure:"default"`
 }
 
 func (e Exif) IsSet() bool {
-	return len(e.SourceFields) > 0
+	return len(e.Fields) > 0
+}
+
+type Hash struct {
+	Md5  bool `mapstructure:"md5"`
+	Sha1 bool `mapstructure:"sha1"`
+}
+
+func (h Hash) IsSet() bool {
+	return h.Md5 || h.Sha1
+}
+
+type Path struct {
+	Extension bool
+	Base      bool
+}
+
+func (p Path) IsSet() bool {
+	return p.Extension || p.Base
+}
+
+// Transform is the transformation of the field
+
+type Transform struct {
+	String String `mapstructure:"string"`
+	Date   Date   `mapstructure:"date"`
+	Binary Binary `mapstructure:"binary"`
+}
+
+type String struct {
+	ToLower bool `mapstructure:"to_lower"`
+	ToUpper bool `mapstructure:"to_upper"`
+	Trim    bool `mapstructure:"trim"`
+
+	Replace map[string]string `mapstructure:"replace"`
 }
 
 type Date struct {
@@ -30,19 +67,11 @@ type Date struct {
 	FormatTemplate string `mapstructure:"format_template"`
 }
 
-func (d Date) IsSet() bool {
-	return d.ParseTemplate != ""
+type Binary struct {
+	FirstBytes int `mapstructure:"first_bytes"`
 }
 
-type Hash struct {
-	Md5        bool `mapstructure:"md5"`
-	Sha1       bool `mapstructure:"sha1"`
-	FirstBytes int  `mapstructure:"first_bytes"`
-}
-
-func (h Hash) IsSet() bool {
-	return h.Md5 || h.Sha1
-}
+// Cross field replace
 
 type Replace struct {
 	SourceField string `mapstructure:"source_field"`
