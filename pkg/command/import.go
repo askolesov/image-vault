@@ -1,7 +1,10 @@
 package command
 
 import (
-	"github.com/askolesov/image-vault/pkg/dir"
+	"github.com/askolesov/image-vault/pkg/config"
+	"github.com/askolesov/image-vault/pkg/copier"
+	"github.com/askolesov/image-vault/pkg/extractor"
+	"github.com/askolesov/image-vault/pkg/scanner"
 	"github.com/barasher/go-exiftool"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/spf13/cobra"
@@ -11,6 +14,7 @@ import (
 
 func getImportCmd() *cobra.Command {
 	var dryRun bool
+	var verify bool
 
 	res := &cobra.Command{
 		Use:   "import",
@@ -25,8 +29,27 @@ func getImportCmd() *cobra.Command {
 				return err
 			}
 
+			// Load config
+			cfg, err := config.Load(dest)
+			if err != nil {
+				return err
+			}
+
+			cfgJson, err := cfg.JSON()
+			if err != nil {
+				return err
+			}
+
+			cmd.Printf("Loaded config: %s\n", cfgJson)
+
+			// Create progress writer
 			pw := progress.NewWriter()
 			go pw.Render()
+
+			// Create services
+			scanner := scanner.NewService(&cfg.Scanner, pw.Log)
+			extractor := extractor.NewService(&cfg.Extractor, et)
+			copier := copier.NewService(&cfg.Copier, pw.Log, extractor)
 
 			// 1. List files
 
@@ -36,7 +59,7 @@ func getImportCmd() *cobra.Command {
 
 			pw.AppendTracker(tracker)
 
-			infos, err := dir.Info(source, cmd.Printf, tracker.Increment)
+			infos, err := scanner.Scan(source, tracker.Increment)
 			if err != nil {
 				return err
 			}
@@ -58,22 +81,6 @@ func getImportCmd() *cobra.Command {
 
 			tracker.MarkAsDone()
 
-			// 3. Link sidecars
-
-			tracker = &progress.Tracker{
-				Message: "Linking sidecars",
-				Total:   int64(len(infos)),
-			}
-
-			pw.AppendTracker(tracker)
-
-			err = dir.LinkSidecars(infos, tracker.Increment)
-			if err != nil {
-				return err
-			}
-
-			tracker.MarkAsDone()
-
 			// 3. Copy files (hashing, getting extractor info will be done inside)
 
 			tracker = &progress.Tracker{
@@ -83,7 +90,7 @@ func getImportCmd() *cobra.Command {
 
 			pw.AppendTracker(tracker)
 
-			err = dir.CopyFiles(infos, dest, et, dryRun, pw.Log, tracker.Increment)
+			err = copier.Copy(infos, dest, dryRun, verify, tracker.Increment)
 			if err != nil {
 				return err
 			}
@@ -102,6 +109,7 @@ func getImportCmd() *cobra.Command {
 	}
 
 	res.Flags().BoolVar(&dryRun, "dry-run", false, "dry run")
+	res.Flags().BoolVar(&verify, "verify", false, "verify copied files")
 
 	return res
 }

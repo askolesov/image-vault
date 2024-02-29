@@ -93,8 +93,8 @@ type Replace struct {
 //	return path.Join(camDir, year, date, fileName)
 //}
 
-func DefaultConfig() Config {
-	return Config{
+func DefaultConfig() *Config {
+	return &Config{
 		Fields: []Field{
 			{
 				Name: "date",

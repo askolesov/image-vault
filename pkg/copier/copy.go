@@ -3,7 +3,7 @@ package copier
 import (
 	"errors"
 	"fmt"
-	"github.com/askolesov/image-vault/pkg2/types"
+	"github.com/askolesov/image-vault/pkg/types"
 	"io"
 	"os"
 	"path"

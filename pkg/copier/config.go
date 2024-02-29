@@ -1,7 +1,7 @@
 package copier
 
 type Config struct {
-	TargetPathTemplate string
+	TargetPathTemplate string `mapstructure:"targetPathTemplate"`
 }
 
 func DefaultConfig() *Config {

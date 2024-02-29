@@ -1,8 +1,6 @@
 package command
 
 import (
-	"encoding/json"
-	"github.com/askolesov/image-vault/pkg/file"
 	"github.com/barasher/go-exiftool"
 	"github.com/spf13/cobra"
 )
@@ -19,24 +17,12 @@ func getInfoCmd() *cobra.Command {
 				return err
 			}
 
-			info := file.NewInfo(target, 0)
+			infos := et.ExtractMetadata(target)
+			info := infos[0]
 
-			err = info.GetExifInfo(et, true)
-			if err != nil {
-				return err
+			for k, v := range info.Fields {
+				cmd.Printf("%s: %s\n", k, v)
 			}
-
-			err = info.GetHashInfo(cmd.Printf)
-			if err != nil {
-				return err
-			}
-
-			infoJson, err := json.MarshalIndent(info, "", "  ")
-			if err != nil {
-				return err
-			}
-
-			cmd.Println(string(infoJson))
 
 			return nil
 		},

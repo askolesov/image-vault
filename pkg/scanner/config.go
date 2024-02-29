@@ -1,11 +1,11 @@
 package scanner
 
 type Config struct {
-	SidecarExtensions []string `mapstructure:"sidecar_extensions"`
+	SidecarExtensions []string `mapstructure:"sidecarExtensions"`
 
-	Skip                 []string `mapstructure:"ignore"`
-	SkipHidden           bool     `mapstructure:"skip_hidden"`
-	SkipPermissionDenied bool     `mapstructure:"skip_permission_denied"`
+	Skip                 []string `mapstructure:"skip"`
+	SkipHidden           bool     `mapstructure:"skipHidden"`
+	SkipPermissionDenied bool     `mapstructure:"skipPermissionDenied"`
 }
 
 func DefaultConfig() *Config {
