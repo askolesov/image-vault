@@ -29,8 +29,12 @@ func TestService_Copy(t *testing.T) {
 		Fields: []extractor.Field{
 			{
 				Name: "year",
-				Exif: extractor.Exif{
-					Fields: []string{"DateTimeOriginal"},
+				Source: extractor.Source{
+					Exif: extractor.Exif{
+						Fields: []string{"DateTimeOriginal"},
+					},
+				},
+				Transform: extractor.Transform{
 					Date: extractor.Date{
 						ParseTemplate:  "2006:01:02 15:04:05",
 						FormatTemplate: "2006",
@@ -39,16 +43,30 @@ func TestService_Copy(t *testing.T) {
 			},
 			{
 				Name: "hash",
-				Hash: extractor.Hash{
-					Md5:        true,
-					FirstBytes: 4,
+				Source: extractor.Source{
+					Hash: extractor.Hash{
+						Md5: true,
+					},
+				},
+				Transform: extractor.Transform{
+					Binary: extractor.Binary{
+						FirstBytes: 4,
+					},
+				},
+			},
+			{
+				Name: "ext",
+				Source: extractor.Source{
+					Path: extractor.Path{
+						Extension: true,
+					},
 				},
 			},
 		},
 	}, et)
 
 	cpr := NewService(&Config{
-		TargetPathTemplate: "{{.year}}/{{.hash}}",
+		TargetPathTemplate: "{{.year}}/{{.hash}}{{.ext}}",
 	}, types.NilLogFn, ext)
 
 	tmpDir := t.TempDir()

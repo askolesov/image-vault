@@ -60,6 +60,9 @@ type String struct {
 	Trim    bool `mapstructure:"trim"`
 
 	Replace map[string]string `mapstructure:"replace"`
+
+	RegexReplaceFrom string `mapstructure:"regex_replace_from"`
+	RegexReplaceTo   string `mapstructure:"regex_replace_to"`
 }
 
 type Date struct {

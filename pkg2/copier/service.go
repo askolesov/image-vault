@@ -6,7 +6,6 @@ import (
 	"github.com/askolesov/image-vault/pkg2/types"
 	"github.com/askolesov/image-vault/pkg2/util"
 	"path"
-	"strings"
 )
 
 type Service struct {
@@ -70,8 +69,8 @@ func (s *Service) copyFile(file *scanner.FileInfo, libPath string, dryRun, verif
 			}
 
 			// change extension to match sidecar
-			sidecarExt := strings.ToLower(path.Ext(file.Path))
-			targetPath := path.Join(libPath, inLibPath+sidecarExt)
+			inLibPath = util.ChangeExtension(inLibPath, path.Ext(file.Path))
+			targetPath := path.Join(libPath, inLibPath)
 
 			err = SmartCopy(file.Path, targetPath, dryRun, verify, s.log)
 			if err != nil {
@@ -90,8 +89,7 @@ func (s *Service) copyFile(file *scanner.FileInfo, libPath string, dryRun, verif
 		return err
 	}
 
-	ext := strings.ToLower(path.Ext(file.Path))
-	targetPath := path.Join(libPath, inLibPath+ext)
+	targetPath := path.Join(libPath, inLibPath)
 
 	err = SmartCopy(file.Path, targetPath, dryRun, verify, s.log)
 	if err != nil {

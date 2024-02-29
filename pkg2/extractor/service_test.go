@@ -161,6 +161,21 @@ func TestExtractMetadata(t *testing.T) {
 					},
 				},
 			},
+			{
+				Name: "mime_first",
+				Source: Source{
+					Exif: Exif{
+						Fields: []string{"MIMEType"},
+					},
+				},
+				Transform: Transform{
+					String: String{
+						ToLower:          true,
+						RegexReplaceFrom: "(.*)/(.*)",
+						RegexReplaceTo:   "$1",
+					},
+				},
+			},
 		},
 		Replace: []Replace{
 			{
@@ -191,4 +206,5 @@ func TestExtractMetadata(t *testing.T) {
 	require.Equal(t, ".jpg", labels["path_extension"])
 	require.Equal(t, "test.jpg", labels["base_path"])
 	require.Equal(t, ".JPG", labels["extension_upper"])
+	require.Equal(t, "image", labels["mime_first"])
 }

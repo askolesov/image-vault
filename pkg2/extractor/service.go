@@ -6,6 +6,7 @@ import (
 	"github.com/barasher/go-exiftool"
 	"github.com/samber/lo"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -197,6 +198,15 @@ func applyStringTransformations(val string, cfg String) string {
 			val = v
 			break
 		}
+	}
+
+	if cfg.RegexReplaceFrom != "" {
+		pattern, err := regexp.Compile(cfg.RegexReplaceFrom)
+		if err != nil {
+			return val
+		}
+
+		val = pattern.ReplaceAllString(val, cfg.RegexReplaceTo)
 	}
 
 	return val
