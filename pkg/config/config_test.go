@@ -18,7 +18,7 @@ func TestDefault(t *testing.T) {
 }
 
 func TestLoadFromEnv(t *testing.T) {
-	t.Setenv("IMAGE_VAULT_COPIER_TARGET_PATH_TEMPLATE", "1.2.3.4")
+	t.Setenv("IMAGE_VAULT_COPIER_TARGETPATHTEMPLATE", "1.2.3.4")
 
 	config, err := Load(".")
 	require.NoError(t, err)
@@ -31,10 +31,10 @@ func TestLoadFromFile(t *testing.T) {
 
 	content := []byte(`
 copier:
-	target_path_template: qqq
+  targetPathTemplate: qqq
 `)
 
-	err := os.WriteFile(path.Join(dir, "image-vault.yaml"), content, fs.ModeTemporary)
+	err := os.WriteFile(path.Join(dir, "image-vault.yaml"), content, fs.ModePerm)
 	require.NoError(t, err)
 
 	config, err := Load(dir)

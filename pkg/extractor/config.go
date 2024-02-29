@@ -84,22 +84,150 @@ type Replace struct {
 	SetValue    string `mapstructure:"set_value"`
 }
 
-//func (i *Info) GetInLibPath() string {
-//	camDir := i.ExifInfo.CameraMake + " " + i.ExifInfo.CameraModel + " (" + i.ExifInfo.MimeType + ")"
-//	year := i.ExifInfo.DateTaken.Format("2006")
-//	date := i.ExifInfo.DateTaken.Format("2006-01-02")
-//	fileName := i.ExifInfo.DateTaken.Format("2006-01-02_15-04-05") + "_" + i.HashInfo.ShortHash + i.Extension
-//
-//	return path.Join(camDir, year, date, fileName)
-//}
-
 func DefaultConfig() *Config {
 	return &Config{
 		Fields: []Field{
 			{
+				Name: "make",
+				Source: Source{
+					Exif: Exif{
+						Fields:  []string{"Make", "DeviceManufacturer"},
+						Default: "NoMake",
+					},
+				},
+				Transform: Transform{
+					String: String{
+						Replace: map[string]string{
+							"SONY": "Sony",
+						},
+					},
+				},
+			},
+			{
+				Name: "model",
+				Source: Source{
+					Exif: Exif{
+						Fields:  []string{"Model", "DeviceModelName"},
+						Default: "NoModel",
+					},
+				},
+				Transform: Transform{
+					String: String{
+						Replace: map[string]string{
+							"Canon EOS 5D":   "EOS 5D",
+							"Canon EOS 450D": "EOS 450D",
+							"Canon EOS 550D": "EOS 550D",
+						},
+					},
+				},
+			},
+			{
+				Name: "year",
+				Source: Source{
+					Exif: Exif{
+						Fields:  []string{"DateTimeOriginal", "MediaCreateDate"},
+						Default: "1970:01:01 00:00:00",
+					},
+				},
+				Transform: Transform{
+					Date: Date{
+						ParseTemplate:  "2006:01:02 15:04:05",
+						FormatTemplate: "2006",
+					},
+				},
+			},
+			{
 				Name: "date",
+				Source: Source{
+					Exif: Exif{
+						Fields:  []string{"DateTimeOriginal", "MediaCreateDate"},
+						Default: "1970:01:01 00:00:00",
+					},
+				},
+				Transform: Transform{
+					Date: Date{
+						ParseTemplate:  "2006:01:02 15:04:05",
+						FormatTemplate: "2006-01-02",
+					},
+				},
+			},
+			{
+				Name: "time",
+				Source: Source{
+					Exif: Exif{
+						Fields:  []string{"DateTimeOriginal", "MediaCreateDate"},
+						Default: "1970:01:01 00:00:00",
+					},
+				},
+				Transform: Transform{
+					Date: Date{
+						ParseTemplate:  "2006:01:02 15:04:05",
+						FormatTemplate: "15-04-05",
+					},
+				},
+			},
+			{
+				Name: "md5_short",
+				Source: Source{
+					Hash: Hash{
+						Md5: true,
+					},
+				},
+				Transform: Transform{
+					Binary: Binary{
+						FirstBytes: 4,
+					},
+				},
+			},
+			{
+				Name: "ext",
+				Source: Source{
+					Path: Path{
+						Extension: true,
+					},
+				},
+				Transform: Transform{
+					String: String{
+						ToLower: true,
+					},
+				},
+			},
+			{
+				Name: "mime_type",
+				Source: Source{
+					Exif: Exif{
+						Fields:  []string{"MIMEType"},
+						Default: "NoMime/NoMime",
+					},
+				},
+				Transform: Transform{
+					String: String{
+						ToLower:          true,
+						RegexReplaceFrom: "(.*)/(.*)",
+						RegexReplaceTo:   "$1",
+					},
+				},
 			},
 		},
-		Replace: []Replace{},
+		Replace: []Replace{
+			{
+				SourceField: "model",
+				ValueEquals: "EOS 5D",
+				TargetField: "make",
+				SetValue:    "Canon",
+			},
+			{
+				SourceField: "model",
+				ValueEquals: "EOS 450D",
+				TargetField: "make",
+				SetValue:    "Canon",
+			},
+			{
+				SourceField: "model",
+				ValueEquals: "EOS 550D",
+				TargetField: "make",
+				SetValue:    "Canon",
+			},
+		},
 	}
 }
