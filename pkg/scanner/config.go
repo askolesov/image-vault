@@ -10,8 +10,9 @@ type Config struct {
 
 func DefaultConfig() *Config {
 	return &Config{
-		SidecarExtensions: []string{".xmp", ".thm", ".lrv", ".mpf", ".aae", ".xml", ".json"},
-		Skip:              []string{".git", ".svn", ".hg", ".bzr", ".DS_Store", "Thumbs.db"},
-		SkipHidden:        true,
+		SidecarExtensions:    []string{".xmp", ".thm", ".lrv", ".mpf", ".aae", ".xml", ".json"},
+		Skip:                 []string{".git", ".svn", ".hg", ".bzr", ".DS_Store", "Thumbs.db"},
+		SkipHidden:           true,
+		SkipPermissionDenied: true,
 	}
 }
