@@ -5,6 +5,7 @@ import (
 	"github.com/askolesov/image-vault/pkg/copier"
 	"github.com/askolesov/image-vault/pkg/extractor"
 	"github.com/askolesov/image-vault/pkg/scanner"
+	verifier "github.com/askolesov/image-vault/pkg/verifyer"
 	"github.com/barasher/go-exiftool"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/spf13/cobra"
@@ -14,7 +15,8 @@ import (
 
 func getImportCmd() *cobra.Command {
 	var dryRun bool
-	var verify bool
+	var errorOnAction bool
+	var verifyContent bool
 
 	res := &cobra.Command{
 		Use:   "import",
@@ -50,6 +52,7 @@ func getImportCmd() *cobra.Command {
 			scanner := scanner.NewService(&cfg.Scanner, pw.Log)
 			extractor := extractor.NewService(&cfg.Extractor, et)
 			copier := copier.NewService(&cfg.Copier, pw.Log, extractor)
+			verifier := verifier.NewService(pw.Log)
 
 			// 1. List files
 
@@ -90,14 +93,28 @@ func getImportCmd() *cobra.Command {
 
 			pw.AppendTracker(tracker)
 
-			err = copier.Copy(infos, dest, dryRun, verify, tracker.Increment)
+			copyLog, err := copier.Copy(infos, dest, dryRun, errorOnAction, tracker.Increment)
 			if err != nil {
 				return err
 			}
 
 			tracker.MarkAsDone()
 
-			// 4. Done
+			// 4. Verify copied files
+
+			tracker = &progress.Tracker{
+				Message: "Verifying copied files",
+				Total:   int64(len(copyLog)),
+			}
+
+			pw.AppendTracker(tracker)
+
+			err = verifier.Verify(copyLog, tracker.Increment)
+			if err != nil {
+				return err
+			}
+
+			// 5. Done
 
 			time.Sleep(1 * time.Second) // to see the progress bar
 			pw.Stop()
@@ -109,7 +126,8 @@ func getImportCmd() *cobra.Command {
 	}
 
 	res.Flags().BoolVar(&dryRun, "dry-run", false, "dry run")
-	res.Flags().BoolVar(&verify, "verify", false, "verify copied files")
+	res.Flags().BoolVar(&errorOnAction, "error-on-action", false, "throw error if any action is required")
+	res.Flags().BoolVar(&verifyContent, "verify-content", true, "verify copied files content")
 
 	return res
 }

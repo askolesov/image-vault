@@ -71,7 +71,7 @@ func TestService_Copy(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	err = cpr.Copy(scan, tmpDir, false, false, types.NilProgressCb)
+	_, err = cpr.Copy(scan, tmpDir, false, false, types.NilProgressCb)
 	require.NoError(t, err)
 
 	// image and sidecar

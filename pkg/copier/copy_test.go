@@ -25,10 +25,10 @@ func TestSmartCopy(t *testing.T) {
 		require.True(t, os.IsNotExist(err))
 	})
 
-	t.Run("verify returns error", func(t *testing.T) {
+	t.Run("errorOnAction returns error", func(t *testing.T) {
 		err := SmartCopy(sourceFile, path.Join(tempDir, "target.txt"), false, true, func(s string, a ...any) {})
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "verify failed")
+		require.Contains(t, err.Error(), "error on action")
 	})
 
 	t.Run("copy", func(t *testing.T) {

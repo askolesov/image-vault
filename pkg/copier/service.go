@@ -30,25 +30,31 @@ func (s *Service) Copy(
 	files []*scanner.FileInfo,
 	libPath string,
 	dryRun bool,
-	verify bool,
+	errorOnAction bool,
 	progressCb types.ProgressCb,
-) error {
+) ([]CopyLog, error) {
+	var log []CopyLog
+
 	for _, file := range files {
-		err := s.copyFile(file, libPath, dryRun, verify)
+		fileLog, err := s.copyFile(file, libPath, dryRun, errorOnAction)
 		if err != nil {
-			return err
+			return log, err
 		}
+
+		log = append(log, fileLog...)
 
 		progressCb(1)
 	}
 
-	return nil
+	return log, nil
 }
 
-func (s *Service) copyFile(file *scanner.FileInfo, libPath string, dryRun, verify bool) error {
+func (s *Service) copyFile(file *scanner.FileInfo, libPath string, dryRun, errorOnAction bool) ([]CopyLog, error) {
+	var log []CopyLog
+
 	err := s.ensureFieldsExtracted(file)
 	if err != nil {
-		return err
+		return log, err
 	}
 
 	// handle sidecar files
@@ -59,44 +65,54 @@ func (s *Service) copyFile(file *scanner.FileInfo, libPath string, dryRun, verif
 			// ensure fields are extracted
 			err := s.ensureFieldsExtracted(mainFile)
 			if err != nil {
-				return err
+				return log, err
 			}
 
 			// get in lib path of the main file
 			inLibPath, err := util.RenderTemplate(s.cfg.TargetPathTemplate, mainFile.Fields)
 			if err != nil {
-				return err
+				return log, err
 			}
 
 			// change extension to match sidecar
 			inLibPath = util.ChangeExtension(inLibPath, path.Ext(file.Path))
 			targetPath := path.Join(libPath, inLibPath)
 
-			err = SmartCopy(file.Path, targetPath, dryRun, verify, s.log)
+			err = SmartCopy(file.Path, targetPath, dryRun, errorOnAction, s.log)
 			if err != nil {
-				return err
+				return log, err
 			}
+
+			log = append(log, CopyLog{
+				Source: file.Path,
+				Target: targetPath,
+			})
 		}
 
 		s.log("Done copying sidecar: " + file.Path)
 
-		return nil
+		return log, nil
 	}
 
 	// handle regular files
 	inLibPath, err := util.RenderTemplate(s.cfg.TargetPathTemplate, file.Fields)
 	if err != nil {
-		return err
+		return log, err
 	}
 
 	targetPath := path.Join(libPath, inLibPath)
 
-	err = SmartCopy(file.Path, targetPath, dryRun, verify, s.log)
+	err = SmartCopy(file.Path, targetPath, dryRun, errorOnAction, s.log)
 	if err != nil {
-		return err
+		return log, err
 	}
 
-	return nil
+	log = append(log, CopyLog{
+		Source: file.Path,
+		Target: targetPath,
+	})
+
+	return log, nil
 }
 
 func (s *Service) ensureFieldsExtracted(f *scanner.FileInfo) error {

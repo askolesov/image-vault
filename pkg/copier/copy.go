@@ -16,7 +16,7 @@ func SmartCopy(
 	source string,
 	target string,
 	dryRun bool,
-	verify bool,
+	errorOnAction bool,
 	logger types.LogFn,
 ) error {
 	// get source file info
@@ -43,8 +43,8 @@ func SmartCopy(
 			logger("Skipping " + source + " to " + target)
 			return nil
 		} else {
-			if verify {
-				return fmt.Errorf("verify failed: target file %s has different size than source file %s", target, source)
+			if errorOnAction {
+				return fmt.Errorf("error on action failed: target file %s has different size than source file %s", target, source)
 			}
 
 			if dryRun {
@@ -60,8 +60,8 @@ func SmartCopy(
 		}
 	}
 
-	if verify {
-		return fmt.Errorf("verify failed: target file %s does not exist", target)
+	if errorOnAction {
+		return fmt.Errorf("error on action: target file %s does not exist", target)
 	}
 
 	if dryRun {
