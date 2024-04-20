@@ -19,11 +19,15 @@ func NewService(log types.LogFn) *Service {
 	}
 }
 
-func (s *Service) Verify(log []copier.CopyLog, progressCb types.ProgressCb) error {
+func (s *Service) Verify(log []copier.CopyLog, progressCb types.ProgressCb, failOnError bool) error {
 	for _, entry := range log {
 		err := s.verifyFilesIdentical(entry)
 		if err != nil {
-			return err
+			s.log("error verifying files: %s\nsource: %s\ntarget: %s\n", err, entry.Source, entry.Target)
+
+			if failOnError {
+				return err
+			}
 		}
 
 		progressCb(1)

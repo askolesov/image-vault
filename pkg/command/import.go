@@ -17,6 +17,7 @@ func getImportCmd() *cobra.Command {
 	var dryRun bool
 	var errorOnAction bool
 	var verifyContent bool
+	var verifyFailOnError bool
 
 	res := &cobra.Command{
 		Use:   "import",
@@ -109,7 +110,7 @@ func getImportCmd() *cobra.Command {
 
 			pw.AppendTracker(tracker)
 
-			err = verifier.Verify(copyLog, tracker.Increment)
+			err = verifier.Verify(copyLog, tracker.Increment, verifyFailOnError)
 			if err != nil {
 				return err
 			}
@@ -128,6 +129,7 @@ func getImportCmd() *cobra.Command {
 	res.Flags().BoolVar(&dryRun, "dry-run", false, "dry run")
 	res.Flags().BoolVar(&errorOnAction, "error-on-action", false, "throw error if any action is required")
 	res.Flags().BoolVar(&verifyContent, "verify-content", true, "verify copied files content")
+	res.Flags().BoolVar(&verifyFailOnError, "verify-fail-on-error", true, "fail if verification fails")
 
 	return res
 }
