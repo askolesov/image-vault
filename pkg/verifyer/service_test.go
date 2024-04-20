@@ -31,7 +31,7 @@ func TestService_Verify(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, service.Verify(copyLog, progressCb))
+	require.NoError(t, service.Verify(copyLog, progressCb, true))
 
 	// create another target file with different content
 	targetPath2 := filepath.Join(tmpDir, "target2")
@@ -49,5 +49,6 @@ func TestService_Verify(t *testing.T) {
 		},
 	}
 
-	require.Error(t, service.Verify(copyLog, progressCb))
+	require.Error(t, service.Verify(copyLog, progressCb, true))
+	require.NoError(t, service.Verify(copyLog, progressCb, false))
 }
