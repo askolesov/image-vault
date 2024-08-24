@@ -16,9 +16,9 @@ func TestListFilesRel(t *testing.T) {
 	require.ElementsMatch(t, []string{
 		".hidden.txt",
 		"capybara.png",
-		"ignored/ignored.txt",
-		"test/test.jpg",
-		"test/test.txt",
-		"test/test.xmp",
+		"ignoredDir/ignored.txt",
+		"testDir/test.jpg",
+		"testDir/test.txt",
+		"testDir/test.xmp",
 	}, list)
 }
