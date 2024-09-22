@@ -3,6 +3,7 @@ package v2
 import (
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
 	"io"
 	"os"
 	"path"
@@ -12,11 +13,11 @@ import (
 // dryRun will only log the actions that would be taken.
 // verify will return if any action is required.
 func SmartCopy(
+	log *zap.Logger,
 	source string,
 	target string,
 	dryRun bool,
 	errorOnAction bool,
-	logger func(string),
 ) error {
 	// get source file info
 	sourceInfo, err := os.Stat(source)
@@ -39,7 +40,7 @@ func SmartCopy(
 		}
 
 		if targetInfo.Size() == sourceInfo.Size() {
-			logger("Skipping " + source + " to " + target)
+			log.Debug("Skipping " + source + " to " + target)
 			return nil
 		} else {
 			if errorOnAction {
@@ -47,9 +48,9 @@ func SmartCopy(
 			}
 
 			if dryRun {
-				logger("Dry run: would remove " + target)
+				log.Debug("Dry run: would remove " + target)
 			} else {
-				logger("Removing " + target)
+				log.Debug("Removing " + target)
 
 				err = os.Remove(target)
 				if err != nil {
@@ -64,11 +65,11 @@ func SmartCopy(
 	}
 
 	if dryRun {
-		logger("Dry run: would copy " + source + " to " + target)
+		log.Debug("Dry run: would copy " + source + " to " + target)
 		return nil
 	}
 
-	logger("Copying " + source + " to " + target)
+	log.Debug("Copying " + source + " to " + target)
 
 	// create directory
 	err = os.MkdirAll(path.Dir(target), os.ModePerm)

@@ -1,47 +1,33 @@
 package v2
 
 import (
-	"go.uber.org/zap"
 	"os"
 	"path/filepath"
+
+	"go.uber.org/zap"
 )
 
-// ListFilesRel walks the file system starting from the root and returns a list of files.
-// Returned paths are relative.
-func ListFilesRel(
-	log *zap.Logger,
-	root string,
-	progressCb func(int642 int64),
-	skipPermissionDenied bool,
-) ([]string, error) {
-	var res []string
+// ListFilesRel walks the file system starting from the root and returns a list of relative file paths.
+func ListFilesRel(log *zap.Logger, root string, progressCb func(int64), skipPermissionDenied bool) ([]string, error) {
+	var files []string
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			// skip permission denied
 			if os.IsPermission(err) && skipPermissionDenied {
-				log.Debug("Skipping permission denied: " + path)
+				log.Debug("Skipping permission denied", zap.String("path", path))
 				return nil
 			}
-
 			return err
 		}
 
-		// skip directories
-		if info.IsDir() {
-			return nil
+		if !info.IsDir() {
+			relPath, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			files = append(files, relPath)
+			progressCb(1)
 		}
-
-		// get the relative path
-		pathRel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-
-		// add files to the result
-		res = append(res, pathRel)
-
-		progressCb(1)
 
 		return nil
 	})
@@ -50,5 +36,5 @@ func ListFilesRel(
 		return nil, err
 	}
 
-	return res, nil
+	return files, nil
 }

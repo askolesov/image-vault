@@ -1,10 +1,10 @@
 package copier
 
 import (
-	"github.com/askolesov/image-vault/pkg/extractor"
-	"github.com/askolesov/image-vault/pkg/scanner"
-	"github.com/askolesov/image-vault/pkg/types"
-	"github.com/askolesov/image-vault/pkg/util"
+	"github.com/askolesov/image-vault/pkg/v1/extractor"
+	"github.com/askolesov/image-vault/pkg/v1/scanner"
+	"github.com/askolesov/image-vault/pkg/v1/types"
+	"github.com/askolesov/image-vault/pkg/v1/util"
 	"path"
 )
 

@@ -1,7 +1,7 @@
 package v2
 
 import (
-	"github.com/askolesov/image-vault/pkg/util"
+	"github.com/askolesov/image-vault/pkg/v1/util"
 	"github.com/samber/lo"
 	"path/filepath"
 	"strings"

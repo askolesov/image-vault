@@ -1,8 +1,8 @@
 package scanner
 
 import (
-	"github.com/askolesov/image-vault/pkg/types"
-	"github.com/askolesov/image-vault/pkg/util"
+	"github.com/askolesov/image-vault/pkg/v1/types"
+	"github.com/askolesov/image-vault/pkg/v1/util"
 	"github.com/samber/lo"
 	"os"
 	"path/filepath"

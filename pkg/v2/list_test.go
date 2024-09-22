@@ -1,9 +1,10 @@
 package v2
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
-	"testing"
 )
 
 func TestListFilesRel(t *testing.T) {

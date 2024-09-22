@@ -1,7 +1,7 @@
 package verifyer
 
 import (
-	"github.com/askolesov/image-vault/pkg/copier"
+	"github.com/askolesov/image-vault/pkg/v1/copier"
 	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"

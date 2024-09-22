@@ -3,7 +3,6 @@ module github.com/askolesov/image-vault
 go 1.21.2
 
 require (
-	github.com/Ankr-network/aapi-evm v0.0.4
 	github.com/barasher/go-exiftool v1.10.0
 	github.com/jedib0t/go-pretty/v6 v6.5.4
 	github.com/mitchellh/mapstructure v1.5.0

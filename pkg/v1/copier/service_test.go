@@ -2,9 +2,9 @@ package copier
 
 import (
 	"bytes"
-	"github.com/askolesov/image-vault/pkg/extractor"
-	"github.com/askolesov/image-vault/pkg/scanner"
-	"github.com/askolesov/image-vault/pkg/types"
+	"github.com/askolesov/image-vault/pkg/v1/extractor"
+	"github.com/askolesov/image-vault/pkg/v1/scanner"
+	"github.com/askolesov/image-vault/pkg/v1/types"
 	"github.com/barasher/go-exiftool"
 	"github.com/stretchr/testify/require"
 	"os"
