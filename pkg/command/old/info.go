@@ -1,13 +1,13 @@
-package command
+package old
 
 import (
 	"github.com/barasher/go-exiftool"
 	"github.com/spf13/cobra"
 )
 
-func getInfoCmd() *cobra.Command {
+func GetOldInfoCmd() *cobra.Command {
 	res := &cobra.Command{
-		Use:  "info",
+		Use:  "info-old",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := args[0]

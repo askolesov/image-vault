@@ -1,4 +1,4 @@
-package command
+package old
 
 import (
 	"github.com/askolesov/image-vault/pkg/v1/config"
@@ -6,9 +6,9 @@ import (
 	"os"
 )
 
-func GetInitCmd() *cobra.Command {
+func GetOldInitCmd() *cobra.Command {
 	res := &cobra.Command{
-		Use:   "init",
+		Use:   "init-old",
 		Short: "initialize the library",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := config.Default()

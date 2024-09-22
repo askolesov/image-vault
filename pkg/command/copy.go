@@ -1,11 +1,11 @@
 package command
 
 import (
-	"github.com/askolesov/image-vault/pkg/config"
-	"github.com/askolesov/image-vault/pkg/copier"
-	"github.com/askolesov/image-vault/pkg/extractor"
-	"github.com/askolesov/image-vault/pkg/scanner"
-	verifier "github.com/askolesov/image-vault/pkg/verifyer"
+	"github.com/askolesov/image-vault/pkg/v1/config"
+	"github.com/askolesov/image-vault/pkg/v1/copier"
+	"github.com/askolesov/image-vault/pkg/v1/extractor"
+	"github.com/askolesov/image-vault/pkg/v1/scanner"
+	verifier "github.com/askolesov/image-vault/pkg/v1/verifyer"
 	"github.com/barasher/go-exiftool"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/spf13/cobra"
@@ -13,15 +13,15 @@ import (
 	"time"
 )
 
-func getImportCmd() *cobra.Command {
+func GetCopyCmd() *cobra.Command {
 	var dryRun bool
 	var errorOnAction bool
 	var verifyContent bool
 	var verifyFailOnError bool
 
 	res := &cobra.Command{
-		Use:   "import",
-		Short: "import media to the library",
+		Use:   "copy",
+		Short: "copy files applying name transformation",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			source := args[0]
