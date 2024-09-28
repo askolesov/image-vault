@@ -1,23 +1,24 @@
 package command
 
 import (
-	"github.com/askolesov/image-vault/pkg/command/old"
 	"github.com/spf13/cobra"
+)
+
+const (
+	AppName = "image-vault"
+	Version = "0.2.0"
 )
 
 func GetRootCommand() *cobra.Command {
 	res := &cobra.Command{
-		Use:   "image-vault",
-		Short: "image-vault is a tool for managing photo libraries",
+		Use:     AppName,
+		Short:   AppName + " is a tool for managing photo libraries",
+		Version: Version,
 	}
 
-	res.AddCommand(GetCopyCmd())
-	res.AddCommand(GetInspectCmd())
 	res.AddCommand(GetInitCmd())
-
-	res.AddCommand(old.GetOldImportCmd())
-	res.AddCommand(old.GetOldInfoCmd())
-	res.AddCommand(old.GetOldInitCmd())
+	res.AddCommand(GetImportCmd())
+	res.AddCommand(GetInfoCmd())
 
 	return res
 }

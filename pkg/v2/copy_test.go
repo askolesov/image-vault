@@ -1,11 +1,12 @@
 package v2
 
 import (
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zaptest"
 	"os"
 	"path"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
 )
 
 func TestSmartCopy(t *testing.T) {
@@ -48,14 +49,28 @@ func TestSmartCopy(t *testing.T) {
 		require.Equal(t, "source", string(targetContent))
 	})
 
-	t.Run("skip same size", func(t *testing.T) {
+	t.Run("skip if same content", func(t *testing.T) {
 		err := SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
 	})
 
-	t.Run("remove and copy", func(t *testing.T) {
+	t.Run("remove and copy if different size", func(t *testing.T) {
 		// create target file with different size
 		err := os.WriteFile(path.Join(tempDir, "target.txt"), []byte("ta"), 0644)
+		require.NoError(t, err)
+
+		err = SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		require.NoError(t, err)
+
+		// target file should have the same content as source file
+		targetContent, err := os.ReadFile(path.Join(tempDir, "target.txt"))
+		require.NoError(t, err)
+		require.Equal(t, "source", string(targetContent))
+	})
+
+	t.Run("remove and copy if same size and different content	", func(t *testing.T) {
+		// create target file with same size but different content
+		err := os.WriteFile(path.Join(tempDir, "target.txt"), []byte("source"), 0644)
 		require.NoError(t, err)
 
 		err = SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)

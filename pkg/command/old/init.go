@@ -1,9 +1,10 @@
 package old
 
 import (
+	"os"
+
 	"github.com/askolesov/image-vault/pkg/v1/config"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 func GetOldInitCmd() *cobra.Command {

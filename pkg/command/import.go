@@ -1,4 +1,4 @@
-package old
+package command
 
 import (
 	"math/rand"
@@ -14,15 +14,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func GetOldImportCmd() *cobra.Command {
+func GetImportCmd() *cobra.Command {
 	var dryRun bool
 	var errorOnAction bool
 	var verifyContent bool
 	var verifyFailOnError bool
 
 	res := &cobra.Command{
-		Use:   "import-old",
-		Short: "import media to the library",
+		Use:   "import",
+		Short: "import files into the library",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			source := args[0]

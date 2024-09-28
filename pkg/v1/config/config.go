@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/askolesov/image-vault/pkg/v1/copier"
 	"github.com/askolesov/image-vault/pkg/v1/extractor"
 	"github.com/askolesov/image-vault/pkg/v1/scanner"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
-	"os"
-	"strings"
 )
 
 const (

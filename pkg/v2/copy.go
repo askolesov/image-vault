@@ -10,8 +10,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// SmartCopyFile copies a file from source to target if the target file does not exist or has a different size.
-// It supports dry run mode and can return an error if any action is required.
+// SmartCopyFile performs an intelligent copy operation from source to target.
+// It handles the following scenarios:
+// - Returns an error if the source is a directory.
+// - Returns an error if there's an issue reading the source or target files.
+// - Compares file content if the target already exists:
+//   - Skips copying if files are identical.
+//   - Removes the existing target if different (based on dryRun and errorOnAction flags).
+//
+// - Returns an error if the target is a directory.
+// - Performs the actual copy operation if all checks pass.
+// The function respects dryRun and errorOnAction flags for safety and logging purposes.
 func SmartCopyFile(log *zap.Logger, source, target string, dryRun, errorOnAction bool) error {
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
@@ -30,10 +39,17 @@ func SmartCopyFile(log *zap.Logger, source, target string, dryRun, errorOnAction
 		if targetInfo.IsDir() {
 			return errors.New("target is a directory")
 		}
-		if targetInfo.Size() == sourceInfo.Size() { // same size, skip (assuming that hash is part of file name)
-			log.Debug("Skipping copy", zap.String("source", source), zap.String("target", target))
+
+		same, err := CompareFiles(source, target)
+		if err != nil {
+			return fmt.Errorf("failed to compare files: %w", err)
+		}
+
+		if same {
+			log.Debug("Skipping copy, same file found", zap.String("source", source), zap.String("target", target))
 			return nil
 		}
+
 		if err := removeTarget(log, target, dryRun, errorOnAction); err != nil {
 			return err
 		}

@@ -5,10 +5,11 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
-	"github.com/barasher/go-exiftool"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/barasher/go-exiftool"
 )
 
 type Metadata struct {

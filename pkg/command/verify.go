@@ -1,6 +1,9 @@
 package command
 
 import (
+	"math/rand"
+	"time"
+
 	"github.com/askolesov/image-vault/pkg/v1/config"
 	"github.com/askolesov/image-vault/pkg/v1/copier"
 	"github.com/askolesov/image-vault/pkg/v1/extractor"
@@ -9,19 +12,17 @@ import (
 	"github.com/barasher/go-exiftool"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/spf13/cobra"
-	"math/rand"
-	"time"
 )
 
-func GetCopyCmd() *cobra.Command {
+func GetVerifyCmd() *cobra.Command {
 	var dryRun bool
 	var errorOnAction bool
 	var verifyContent bool
 	var verifyFailOnError bool
 
 	res := &cobra.Command{
-		Use:   "copy",
-		Short: "copy files applying name transformation",
+		Use:   "import",
+		Short: "import files into the library",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			source := args[0]
