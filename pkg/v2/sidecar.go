@@ -1,10 +1,11 @@
 package v2
 
 import (
-	"github.com/askolesov/image-vault/pkg/v1/util"
-	"github.com/samber/lo"
 	"path/filepath"
 	"strings"
+
+	"github.com/askolesov/image-vault/pkg/v1/util"
+	"github.com/samber/lo"
 )
 
 type FileWithSidecars struct {
@@ -56,7 +57,7 @@ func LinkSidecars(
 		result = append(result, fs)
 	}
 
-	// 3. add sidecars without primaries to the result
+	// 3. add sidecars without primaries to the result as primaries
 
 	primariesByPathWithoutExt := lo.GroupBy(primaries, PathWithoutExtension)
 

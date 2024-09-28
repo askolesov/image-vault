@@ -19,7 +19,7 @@ func TestSmartCopy(t *testing.T) {
 	log := zaptest.NewLogger(t)
 
 	t.Run("dry run doesn't copy", func(t *testing.T) {
-		err := SmartCopy(log, sourceFile, path.Join(tempDir, "target.txt"), true, false)
+		err := SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), true, false)
 		require.NoError(t, err)
 
 		// no target file should not be created
@@ -29,13 +29,13 @@ func TestSmartCopy(t *testing.T) {
 	})
 
 	t.Run("errorOnAction returns error", func(t *testing.T) {
-		err := SmartCopy(log, sourceFile, path.Join(tempDir, "target.txt"), false, true)
+		err := SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, true)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "error on action")
+		require.Contains(t, err.Error(), "would copy file")
 	})
 
 	t.Run("copy", func(t *testing.T) {
-		err := SmartCopy(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		err := SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
 
 		// target file should be created
@@ -49,7 +49,7 @@ func TestSmartCopy(t *testing.T) {
 	})
 
 	t.Run("skip same size", func(t *testing.T) {
-		err := SmartCopy(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		err := SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
 	})
 
@@ -58,7 +58,7 @@ func TestSmartCopy(t *testing.T) {
 		err := os.WriteFile(path.Join(tempDir, "target.txt"), []byte("ta"), 0644)
 		require.NoError(t, err)
 
-		err = SmartCopy(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		err = SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
 
 		// target file should have the same content as source file
@@ -67,8 +67,16 @@ func TestSmartCopy(t *testing.T) {
 		require.Equal(t, "source", string(targetContent))
 	})
 
-	t.Run("verify returns no error", func(t *testing.T) {
-		err := SmartCopy(log, sourceFile, path.Join(tempDir, "target.txt"), false, true)
+	t.Run("target is existing directory", func(t *testing.T) {
+		err := os.Mkdir(path.Join(tempDir, "target"), 0755)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			err := os.Remove(path.Join(tempDir, "target"))
+			require.NoError(t, err)
+		})
+
+		err = SmartCopyFile(log, sourceFile, path.Join(tempDir, "target"), false, false)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "target is a directory")
 	})
 }
