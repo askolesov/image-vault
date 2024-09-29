@@ -1,10 +1,9 @@
-package v2
+package util
 
 import (
 	"path/filepath"
 	"strings"
 
-	"github.com/askolesov/image-vault/pkg/v1/util"
 	"github.com/samber/lo"
 )
 
@@ -49,7 +48,7 @@ func LinkSidecars(
 			Path: f,
 		}
 
-		pathWithoutExt := util.GetPathWithoutExtension(f)
+		pathWithoutExt := PathWithoutExtension(f)
 		if fSidecars, ok := sidecarsByPathWithoutExt[pathWithoutExt]; ok {
 			fs.Sidecars = fSidecars
 		}
@@ -62,7 +61,7 @@ func LinkSidecars(
 	primariesByPathWithoutExt := lo.GroupBy(primaries, PathWithoutExtension)
 
 	for _, f := range sidecars {
-		pathWithoutExt := util.GetPathWithoutExtension(f)
+		pathWithoutExt := PathWithoutExtension(f)
 		if _, ok := primariesByPathWithoutExt[pathWithoutExt]; !ok {
 			result = append(result, FileWithSidecars{
 				Path: f,

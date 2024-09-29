@@ -1,4 +1,4 @@
-package v2
+package util
 
 import (
 	ignore "github.com/sabhiram/go-gitignore"

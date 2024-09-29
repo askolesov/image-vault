@@ -1,4 +1,4 @@
-package v2
+package util
 
 import (
 	"testing"
@@ -54,7 +54,7 @@ func TestRenderTemplate(t *testing.T) {
 
 	t.Run("Test Sprig function index", func(t *testing.T) {
 		fields := map[string]string{
-			"type1": "application/json",
+			"type": "application/json",
 		}
 
 		templateStr := `{{ .type | default "unknown/unknown" | splitList "/" | first }}`

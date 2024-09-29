@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	v2 "github.com/askolesov/image-vault/pkg/v2"
+	"github.com/askolesov/image-vault/pkg/util"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +26,7 @@ func GetInitCmd() *cobra.Command {
 }
 
 func ensureLibraryInitialized(cmd *cobra.Command) error {
-	cfgExists, err := v2.IsConfigExists(DefaultConfigFile)
+	cfgExists, err := util.IsConfigExists(DefaultConfigFile)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func initLibrary(cmd *cobra.Command) error {
 	}
 
 	// Write default config to file
-	err = v2.WriteDefaultConfigToFile(DefaultConfigFile)
+	err = util.WriteDefaultConfigToFile(DefaultConfigFile)
 	if err != nil {
 		return err
 	}

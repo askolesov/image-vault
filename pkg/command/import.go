@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	v2 "github.com/askolesov/image-vault/pkg/v2"
+	"github.com/askolesov/image-vault/pkg/util"
 	"github.com/barasher/go-exiftool"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/spf13/cobra"
@@ -53,7 +53,7 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 	}
 
 	// Load config
-	cfg, err := v2.ReadConfigFromFile(DefaultConfigFile)
+	cfg, err := util.ReadConfigFromFile(DefaultConfigFile)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 
 	pw.AppendTracker(tracker)
 
-	inFilesRel, err := v2.ListFilesRel(pw.Log, importPath, tracker.Increment, cfg.SkipPermissionDenied)
+	inFilesRel, err := util.ListFilesRel(pw.Log, importPath, tracker.Increment, cfg.SkipPermissionDenied)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 
 	pw.AppendTracker(tracker)
 
-	inFilesRel = v2.FilterIgnore(inFilesRel, cfg.Ignore, tracker.Increment)
+	inFilesRel = util.FilterIgnore(inFilesRel, cfg.Ignore, tracker.Increment)
 
 	tracker.MarkAsDone()
 
@@ -102,7 +102,7 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 
 	pw.Log("Linking sidecar files")
 
-	inFilesRelLinked := v2.LinkSidecars(cfg.SidecarExtensions, inFilesRel)
+	inFilesRelLinked := util.LinkSidecars(cfg.SidecarExtensions, inFilesRel)
 
 	// 4. Shuffle files
 
@@ -130,17 +130,17 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 
 	for _, f := range inFilesRelLinked {
 		// Copy main file
-		info, err := v2.ExtractMetadata(et, importPath, f.Path)
+		info, err := util.ExtractMetadata(et, importPath, f.Path)
 		if err != nil {
 			return fmt.Errorf("failed to extract metadata for %s: %w", f.Path, err)
 		}
 
-		targetPath, err := v2.RenderTemplate(cfg.Template, info)
+		targetPath, err := util.RenderTemplate(cfg.Template, info)
 		if err != nil {
 			return fmt.Errorf("failed to render template for %s: %w", f.Path, err)
 		}
 
-		err = v2.SmartCopyFile(
+		err = util.SmartCopyFile(
 			pw.Log,
 			path.Join(importPath, f.Path),
 			path.Join(libPath, targetPath),
@@ -155,7 +155,7 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 		for _, sidecar := range f.Sidecars {
 			// Use the same name as the main file, but with the sidecar extension
 			sidecarPath := replaceExtension(targetPath, filepath.Ext(sidecar))
-			err = v2.SmartCopyFile(
+			err = util.SmartCopyFile(
 				pw.Log,
 				path.Join(importPath, sidecarPath),
 				path.Join(libPath, sidecarPath),

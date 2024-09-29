@@ -3,7 +3,7 @@ package command
 import (
 	"os"
 
-	v2 "github.com/askolesov/image-vault/pkg/v2"
+	"github.com/askolesov/image-vault/pkg/util"
 	"github.com/barasher/go-exiftool"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
@@ -33,7 +33,7 @@ func showFileInfo(cmd *cobra.Command, target string) error {
 		return err
 	}
 
-	infos, err := v2.ExtractMetadata(et, dir, target)
+	infos, err := util.ExtractMetadata(et, dir, target)
 	if err != nil {
 		return err
 	}

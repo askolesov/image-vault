@@ -1,4 +1,4 @@
-package v2
+package util
 
 import (
 	"os"
@@ -12,7 +12,9 @@ func TestCompareFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func(path string) {
+		_ = os.RemoveAll(path)
+	}(tempDir)
 
 	// Helper function to create a file with content
 	createFile := func(name, content string) string {
