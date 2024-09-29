@@ -27,7 +27,9 @@ const (
 template: |-
   {{- $make := or .Exif.Make .Exif.DeviceManufacturer "NoMake" -}}
   {{- $model := or .Exif.Model .Exif.DeviceModelName "NoModel" -}}
-  {{- $date := or .Exif.DateTimeOriginal .Exif.MediaCreateDate "1970:01:01 00:00:00" | toDate "2006:01:02 15:04:05" -}}
+  {{- $dateTimeOriginal := and (any .Exif.DateTimeOriginal) (ne .Exif.DateTimeOriginal "0000:00:00 00:00:00") | ternary .Exif.DateTimeOriginal "" -}}
+  {{- $mediaCreateDate := and (any .Exif.MediaCreateDate) (ne .Exif.MediaCreateDate "0000:00:00 00:00:00") | ternary .Exif.MediaCreateDate "" -}}
+  {{- $date := or $dateTimeOriginal $mediaCreateDate "1970:01:01 00:00:00" | toDate "2006:01:02 15:04:05" -}}
   {{- $mimeType := .Exif.MIMEType | default "unknown/unknown" | splitList "/" | first -}}
   {{$make}} {{$model}} ({{$mimeType}})/{{$date | date "2006"}}/{{$date | date "2006-01-02"}}/{{$date | date "2006-01-02_15-04-05"}}_{{.Hash.Md5Short}}{{.Fs.Ext}}
 
