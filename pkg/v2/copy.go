@@ -6,8 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-
-	"go.uber.org/zap"
 )
 
 // SmartCopyFile performs an intelligent copy operation from source to target.
@@ -21,7 +19,7 @@ import (
 // - Returns an error if the target is a directory.
 // - Performs the actual copy operation if all checks pass.
 // The function respects dryRun and errorOnAction flags for safety and logging purposes.
-func SmartCopyFile(log *zap.Logger, source, target string, dryRun, errorOnAction bool) error {
+func SmartCopyFile(log func(string, ...any), source, target string, dryRun, errorOnAction bool) error {
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
 		return fmt.Errorf("failed to stat source file: %w", err)
@@ -46,7 +44,7 @@ func SmartCopyFile(log *zap.Logger, source, target string, dryRun, errorOnAction
 		}
 
 		if same {
-			log.Debug("Skipping copy, same file found", zap.String("source", source), zap.String("target", target))
+			log("Skipping copy, same file found: source=%s, target=%s", source, target)
 			return nil
 		}
 
@@ -58,29 +56,29 @@ func SmartCopyFile(log *zap.Logger, source, target string, dryRun, errorOnAction
 	return performCopy(log, source, target, dryRun, errorOnAction)
 }
 
-func removeTarget(log *zap.Logger, target string, dryRun, errorOnAction bool) error {
+func removeTarget(log func(string, ...any), target string, dryRun, errorOnAction bool) error {
 	if dryRun {
-		log.Debug("Dry run: would remove", zap.String("target", target))
+		log("Dry run: would remove: target=%s", target)
 		return nil
 	}
 	if errorOnAction {
 		return errors.New("would remove target file")
 	}
 
-	log.Debug("Removing", zap.String("target", target))
+	log("Removing: target=%s", target)
 	return os.Remove(target)
 }
 
-func performCopy(log *zap.Logger, source, target string, dryRun, errorOnAction bool) error {
+func performCopy(log func(string, ...any), source, target string, dryRun, errorOnAction bool) error {
 	if dryRun {
-		log.Debug("Dry run: would copy", zap.String("source", source), zap.String("target", target))
+		log("Dry run: would copy: source=%s, target=%s", source, target)
 		return nil
 	}
 	if errorOnAction {
 		return errors.New("would copy file")
 	}
 
-	log.Debug("Copying", zap.String("source", source), zap.String("target", target))
+	log("Copying: source=%s, target=%s", source, target)
 
 	if err := os.MkdirAll(filepath.Dir(target), os.ModePerm); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)

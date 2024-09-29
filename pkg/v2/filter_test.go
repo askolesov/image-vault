@@ -1,8 +1,9 @@
 package v2
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestFilterIgnore(t *testing.T) {
@@ -40,7 +41,7 @@ func TestFilterIgnore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FilterIgnore(tt.paths, tt.ignorePatterns)
+			result := FilterIgnore(tt.paths, tt.ignorePatterns, func(int64) {})
 			require.Equal(t, tt.expected, result)
 		})
 	}

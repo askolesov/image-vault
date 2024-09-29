@@ -3,18 +3,16 @@ package v2
 import (
 	"os"
 	"path/filepath"
-
-	"go.uber.org/zap"
 )
 
 // ListFilesRel walks the file system starting from the root and returns a list of relative file paths.
-func ListFilesRel(log *zap.Logger, root string, progressCb func(int64), skipPermissionDenied bool) ([]string, error) {
+func ListFilesRel(log func(string, ...any), root string, progressCb func(int64), skipPermissionDenied bool) ([]string, error) {
 	var files []string
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			if os.IsPermission(err) && skipPermissionDenied {
-				log.Debug("Skipping permission denied", zap.String("path", path))
+				log("Skipping permission denied: %s", path)
 				return nil
 			}
 			return err

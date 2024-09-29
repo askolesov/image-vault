@@ -51,4 +51,16 @@ func TestRenderTemplate(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "Hello, JOHN DOE!", got)
 	})
+
+	t.Run("Test Sprig function index", func(t *testing.T) {
+		fields := map[string]string{
+			"type1": "application/json",
+		}
+
+		templateStr := `{{ .type | default "unknown/unknown" | splitList "/" | first }}`
+
+		got, err := RenderTemplate(templateStr, fields)
+		require.NoError(t, err)
+		require.Equal(t, "application", got)
+	})
 }

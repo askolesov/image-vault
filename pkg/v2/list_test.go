@@ -4,15 +4,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zaptest"
 )
 
 func TestListFilesRel(t *testing.T) {
 	root := "testdata"
-	log := zaptest.NewLogger(t)
 	progressCb := func(int64) {}
 
-	list, err := ListFilesRel(log, root, progressCb, false)
+	list, err := ListFilesRel(t.Logf, root, progressCb, false)
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{
 		".hidden.txt",

@@ -2,13 +2,12 @@ package command
 
 import (
 	"math/rand"
-	"time"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 
-	"github.com/askolesov/image-vault/pkg/v1/config"
-	"github.com/askolesov/image-vault/pkg/v1/copier"
-	"github.com/askolesov/image-vault/pkg/v1/extractor"
-	"github.com/askolesov/image-vault/pkg/v1/scanner"
-	verifier "github.com/askolesov/image-vault/pkg/v1/verifyer"
+	v2 "github.com/askolesov/image-vault/pkg/v2"
 	"github.com/barasher/go-exiftool"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/spf13/cobra"
@@ -16,121 +15,170 @@ import (
 
 func GetImportCmd() *cobra.Command {
 	var dryRun bool
-	var errorOnAction bool
-	var verifyContent bool
-	var verifyFailOnError bool
 
 	res := &cobra.Command{
 		Use:   "import",
 		Short: "import files into the library",
-		Args:  cobra.ExactArgs(2),
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			source := args[0]
-			dest := args[1]
-
-			et, err := exiftool.NewExiftool()
+			// Ensure library is initialized
+			cfgExists, err := v2.IsConfigExists(DefaultConfigFile)
 			if err != nil {
 				return err
 			}
-
-			// Load config
-			cfg, err := config.Load(dest)
-			if err != nil {
-				return err
+			if !cfgExists {
+				err := initLibrary(cmd)
+				if err != nil {
+					return err
+				}
 			}
 
-			cfgJson, err := cfg.JSON()
-			if err != nil {
-				return err
-			}
-
-			cmd.Printf("Loaded config: %s\n", cfgJson)
-
-			// Create progress writer
-			pw := progress.NewWriter()
-			go pw.Render()
-
-			// Create services
-			scanner := scanner.NewService(&cfg.Scanner, pw.Log)
-			extractor := extractor.NewService(&cfg.Extractor, et)
-			copier := copier.NewService(&cfg.Copier, pw.Log, extractor)
-			verifier := verifier.NewService(pw.Log)
-
-			// 1. List files
-
-			tracker := &progress.Tracker{
-				Message: "Building file list",
-			}
-
-			pw.AppendTracker(tracker)
-
-			infos, err := scanner.Scan(source, tracker.Increment)
-			if err != nil {
-				return err
-			}
-
-			tracker.MarkAsDone()
-
-			// 2. Shuffle files
-
-			tracker = &progress.Tracker{
-				Message: "Shuffling files",
-			}
-
-			pw.AppendTracker(tracker)
-
-			rand.Shuffle(len(infos), func(i, j int) {
-				infos[i], infos[j] = infos[j], infos[i]
-				tracker.Increment(1)
-			})
-
-			tracker.MarkAsDone()
-
-			// 3. Copy files (hashing, getting extractor info will be done inside)
-
-			tracker = &progress.Tracker{
-				Message: "Copying files",
-				Total:   int64(len(infos)),
-			}
-
-			pw.AppendTracker(tracker)
-
-			copyLog, err := copier.Copy(infos, dest, dryRun, errorOnAction, tracker.Increment)
-			if err != nil {
-				return err
-			}
-
-			tracker.MarkAsDone()
-
-			// 4. Verify copied files
-
-			tracker = &progress.Tracker{
-				Message: "Verifying copied files",
-				Total:   int64(len(copyLog)),
-			}
-
-			pw.AppendTracker(tracker)
-
-			err = verifier.Verify(copyLog, tracker.Increment, verifyFailOnError)
-			if err != nil {
-				return err
-			}
-
-			// 5. Done
-
-			time.Sleep(1 * time.Second) // to see the progress bar
-			pw.Stop()
-
-			cmd.Println("Done")
-
-			return nil
+			// Import files
+			return importFiles(cmd, args[0], dryRun, false)
 		},
 	}
 
 	res.Flags().BoolVar(&dryRun, "dry-run", false, "dry run")
-	res.Flags().BoolVar(&errorOnAction, "error-on-action", false, "throw error if any action is required")
-	res.Flags().BoolVar(&verifyContent, "verify-content", true, "verify copied files content")
-	res.Flags().BoolVar(&verifyFailOnError, "verify-fail-on-error", true, "fail if verification fails")
 
 	return res
+}
+
+func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bool) error {
+	// Get library path
+	libPath, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	// Get exiftool
+	et, err := exiftool.NewExiftool()
+	if err != nil {
+		return err
+	}
+
+	// Load config
+	cfg, err := v2.ReadConfigFromFile(DefaultConfigFile)
+	if err != nil {
+		return err
+	}
+
+	cfgJson, err := cfg.JSON()
+	if err != nil {
+		return err
+	}
+
+	cmd.Printf("Loaded config: %s\n", cfgJson)
+
+	// Create progress writer
+	pw := progress.NewWriter()
+	go pw.Render()
+	defer pw.Stop()
+
+	// 1. List files
+
+	tracker := &progress.Tracker{
+		Message: "Building file list",
+	}
+
+	pw.AppendTracker(tracker)
+
+	inFilesRel, err := v2.ListFilesRel(pw.Log, importPath, tracker.Increment, cfg.SkipPermissionDenied)
+	if err != nil {
+		return err
+	}
+
+	tracker.MarkAsDone()
+
+	// 2. Filter files
+
+	tracker = &progress.Tracker{
+		Message: "Filtering files",
+		Total:   int64(len(inFilesRel)),
+	}
+
+	pw.AppendTracker(tracker)
+
+	inFilesRel = v2.FilterIgnore(inFilesRel, cfg.Ignore, tracker.Increment)
+
+	tracker.MarkAsDone()
+
+	// 3. Link sidecar files
+
+	pw.Log("Linking sidecar files")
+
+	inFilesRelLinked := v2.LinkSidecars(cfg.SidecarExtensions, inFilesRel)
+
+	// 4. Shuffle files
+
+	tracker = &progress.Tracker{
+		Message: "Shuffling files",
+	}
+
+	pw.AppendTracker(tracker)
+
+	rand.Shuffle(len(inFilesRelLinked), func(i, j int) {
+		inFilesRelLinked[i], inFilesRelLinked[j] = inFilesRelLinked[j], inFilesRelLinked[i]
+		tracker.Increment(1)
+	})
+
+	tracker.MarkAsDone()
+
+	// 5. Copy files (hashing, getting extractor info will be done inside)
+
+	tracker = &progress.Tracker{
+		Message: "Copying files",
+		Total:   int64(len(inFilesRelLinked)),
+	}
+
+	pw.AppendTracker(tracker)
+
+	for _, f := range inFilesRelLinked {
+		// todo: remove
+		pw.Log(f.Path)
+
+		// Copy main file
+		info, err := v2.ExtractMetadata(et, importPath, f.Path)
+		if err != nil {
+			return err
+		}
+
+		targetPath, err := v2.RenderTemplate(cfg.Path, info)
+		if err != nil {
+			return err
+		}
+
+		v2.SmartCopyFile(
+			pw.Log,
+			path.Join(importPath, f.Path),
+			path.Join(libPath, targetPath),
+			dryRun,
+			errorOnAction,
+		)
+
+		// Copy sidecar files
+		for _, sidecar := range f.Sidecars {
+			// Use the same name as the main file, but with the sidecar extension
+			sidecarPath := replaceExtension(targetPath, filepath.Ext(sidecar))
+			v2.SmartCopyFile(
+				pw.Log,
+				path.Join(importPath, sidecarPath),
+				path.Join(libPath, sidecarPath),
+				dryRun,
+				errorOnAction,
+			)
+		}
+	}
+
+	tracker.MarkAsDone()
+
+	// 6. Done
+
+	pw.Log("Done")
+
+	return nil
+}
+
+func replaceExtension(path string, extension string) string {
+	ext := filepath.Ext(path)
+	return strings.TrimSuffix(path, ext) + extension
 }
