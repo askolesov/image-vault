@@ -1,11 +1,13 @@
 package command
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	v2 "github.com/askolesov/image-vault/pkg/v2"
 	"github.com/barasher/go-exiftool"
@@ -22,15 +24,9 @@ func GetImportCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Ensure library is initialized
-			cfgExists, err := v2.IsConfigExists(DefaultConfigFile)
+			err := ensureLibraryInitialized(cmd)
 			if err != nil {
 				return err
-			}
-			if !cfgExists {
-				err := initLibrary(cmd)
-				if err != nil {
-					return err
-				}
 			}
 
 			// Import files
@@ -133,40 +129,45 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 	pw.AppendTracker(tracker)
 
 	for _, f := range inFilesRelLinked {
-		// todo: remove
-		pw.Log(f.Path)
-
 		// Copy main file
 		info, err := v2.ExtractMetadata(et, importPath, f.Path)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to extract metadata for %s: %w", f.Path, err)
 		}
 
-		targetPath, err := v2.RenderTemplate(cfg.Path, info)
+		targetPath, err := v2.RenderTemplate(cfg.Template, info)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to render template for %s: %w", f.Path, err)
 		}
 
-		v2.SmartCopyFile(
+		err = v2.SmartCopyFile(
 			pw.Log,
 			path.Join(importPath, f.Path),
 			path.Join(libPath, targetPath),
 			dryRun,
 			errorOnAction,
 		)
+		if err != nil {
+			return fmt.Errorf("failed to copy file %s to %s: %w", f.Path, targetPath, err)
+		}
 
 		// Copy sidecar files
 		for _, sidecar := range f.Sidecars {
 			// Use the same name as the main file, but with the sidecar extension
 			sidecarPath := replaceExtension(targetPath, filepath.Ext(sidecar))
-			v2.SmartCopyFile(
+			err = v2.SmartCopyFile(
 				pw.Log,
 				path.Join(importPath, sidecarPath),
 				path.Join(libPath, sidecarPath),
 				dryRun,
 				errorOnAction,
 			)
+			if err != nil {
+				return fmt.Errorf("failed to copy sidecar file %s to %s: %w", sidecar, sidecarPath, err)
+			}
 		}
+
+		tracker.Increment(1)
 	}
 
 	tracker.MarkAsDone()
@@ -174,6 +175,9 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 	// 6. Done
 
 	pw.Log("Done")
+
+	// Add a small delay to ensure all progress updates are rendered
+	time.Sleep(1000 * time.Millisecond)
 
 	return nil
 }

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zaptest"
 )
 
 func TestSmartCopy(t *testing.T) {
@@ -17,10 +16,8 @@ func TestSmartCopy(t *testing.T) {
 	err := os.WriteFile(sourceFile, []byte("source"), 0644)
 	require.NoError(t, err)
 
-	log := zaptest.NewLogger(t)
-
 	t.Run("dry run doesn't copy", func(t *testing.T) {
-		err := SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), true, false)
+		err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), true, false)
 		require.NoError(t, err)
 
 		// no target file should not be created
@@ -30,13 +27,13 @@ func TestSmartCopy(t *testing.T) {
 	})
 
 	t.Run("errorOnAction returns error", func(t *testing.T) {
-		err := SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, true)
+		err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, true)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "would copy file")
 	})
 
 	t.Run("copy", func(t *testing.T) {
-		err := SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
 
 		// target file should be created
@@ -50,7 +47,7 @@ func TestSmartCopy(t *testing.T) {
 	})
 
 	t.Run("skip if same content", func(t *testing.T) {
-		err := SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
 	})
 
@@ -59,7 +56,7 @@ func TestSmartCopy(t *testing.T) {
 		err := os.WriteFile(path.Join(tempDir, "target.txt"), []byte("ta"), 0644)
 		require.NoError(t, err)
 
-		err = SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		err = SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
 
 		// target file should have the same content as source file
@@ -73,7 +70,7 @@ func TestSmartCopy(t *testing.T) {
 		err := os.WriteFile(path.Join(tempDir, "target.txt"), []byte("source"), 0644)
 		require.NoError(t, err)
 
-		err = SmartCopyFile(log, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		err = SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
 
 		// target file should have the same content as source file
@@ -90,7 +87,7 @@ func TestSmartCopy(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		err = SmartCopyFile(log, sourceFile, path.Join(tempDir, "target"), false, false)
+		err = SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target"), false, false)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "target is a directory")
 	})
