@@ -20,6 +20,11 @@ import (
 // - Performs the actual copy operation if all checks pass.
 // The function respects dryRun and errorOnAction flags for safety and logging purposes.
 func SmartCopyFile(log func(string, ...any), source, target string, dryRun, errorOnAction bool) error {
+	if source == target {
+		log("Skipping copy, source and target are the same: source=%s, target=%s", source, target)
+		return nil
+	}
+
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
 		return fmt.Errorf("failed to stat source file: %w", err)
