@@ -24,7 +24,7 @@ func GetVerifyCmd() *cobra.Command {
 			}
 
 			// Verify library
-			return importFiles(cmd, libPath, false, true)
+			return addFiles(cmd, libPath, false, true)
 		},
 	}
 

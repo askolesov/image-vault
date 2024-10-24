@@ -9,18 +9,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/askolesov/image-vault/pkg/util"
+	"github.com/askolesov/image-vault/pkg/vault"
 	"github.com/barasher/go-exiftool"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/spf13/cobra"
 )
 
-func GetImportCmd() *cobra.Command {
+func GetAddCmd() *cobra.Command {
 	var dryRun bool
 
 	res := &cobra.Command{
-		Use:   "import",
-		Short: "import files into the library",
+		Use:   "add",
+		Short: "add files into the library",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Ensure library is initialized
@@ -29,8 +29,8 @@ func GetImportCmd() *cobra.Command {
 				return err
 			}
 
-			// Import files
-			return importFiles(cmd, args[0], dryRun, false)
+			// Add files
+			return addFiles(cmd, args[0], dryRun, false)
 		},
 	}
 
@@ -39,7 +39,7 @@ func GetImportCmd() *cobra.Command {
 	return res
 }
 
-func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bool) error {
+func addFiles(cmd *cobra.Command, addPath string, dryRun, errorOnAction bool) error {
 	// Get library path
 	libPath, err := os.Getwd()
 	if err != nil {
@@ -78,7 +78,7 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 
 	pw.AppendTracker(tracker)
 
-	inFilesRel, err := util.ListFilesRel(pw.Log, importPath, tracker.Increment, cfg.SkipPermissionDenied)
+	inFilesRel, err := util.ListFilesRel(pw.Log, addPath, tracker.Increment, cfg.SkipPermissionDenied)
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 
 	for _, f := range inFilesRelLinked {
 		// Copy main file
-		info, err := util.ExtractMetadata(et, importPath, f.Path)
+		info, err := util.ExtractMetadata(et, addPath, f.Path)
 		if err != nil {
 			return fmt.Errorf("failed to extract metadata for %s: %w", f.Path, err)
 		}
@@ -142,7 +142,7 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 
 		err = util.SmartCopyFile(
 			pw.Log,
-			path.Join(importPath, f.Path),
+			path.Join(addPath, f.Path),
 			path.Join(libPath, targetPath),
 			dryRun,
 			errorOnAction,
@@ -157,7 +157,7 @@ func importFiles(cmd *cobra.Command, importPath string, dryRun, errorOnAction bo
 			sidecarPath := replaceExtension(targetPath, filepath.Ext(sidecar))
 			err = util.SmartCopyFile(
 				pw.Log,
-				path.Join(importPath, sidecarPath),
+				path.Join(addPath, sidecarPath),
 				path.Join(libPath, sidecarPath),
 				dryRun,
 				errorOnAction,

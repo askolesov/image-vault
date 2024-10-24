@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/askolesov/image-vault/pkg/util"
+	"github.com/askolesov/image-vault/pkg/vault"
 	"github.com/spf13/cobra"
 )
 

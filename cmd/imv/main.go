@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/askolesov/image-vault/pkg/command"
 	"os"
+
+	"github.com/askolesov/image-vault/pkg/command"
 )
 
 func main() {
