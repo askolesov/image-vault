@@ -33,7 +33,7 @@ func showFileInfo(cmd *cobra.Command, target string) error {
 		return err
 	}
 
-	infos, err := util.ExtractMetadata(et, dir, target)
+	infos, err := vault.ExtractMetadata(et, dir, target)
 	if err != nil {
 		return err
 	}

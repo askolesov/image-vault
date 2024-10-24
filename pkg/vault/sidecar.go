@@ -1,4 +1,4 @@
-package util
+package vault
 
 import (
 	"path/filepath"
@@ -18,7 +18,7 @@ func LinkSidecars(
 ) []FileWithSidecars {
 	// helper functions
 
-	sidecarExts := lo.Associate(sidecarExtensions, func(item string) (string, any) {
+	sidecarExts := lo.Associate(sidecarExtensions, func(item string) (string, bool) {
 		return strings.ToLower(item), true
 	})
 

@@ -1,4 +1,4 @@
-package util
+package vault
 
 import (
 	"encoding/json"
@@ -43,9 +43,9 @@ ignore:
 
 # sidecarExtensions: List of file extensions for sidecar files.
 sidecarExtensions:
-  - "*.xmp"
-  - "*.yaml"
-  - "*.json"
+  - ".xmp"
+  - ".yaml"
+  - ".json"
 `
 )
 

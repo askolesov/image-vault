@@ -1,4 +1,4 @@
-package util
+package vault
 
 import (
 	"crypto/md5"
