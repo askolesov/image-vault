@@ -53,7 +53,7 @@ func addFiles(cmd *cobra.Command, addPath string, dryRun, errorOnAction bool) er
 	}
 
 	// Load config
-	cfg, err := util.ReadConfigFromFile(DefaultConfigFile)
+	cfg, err := vault.ReadConfigFromFile(DefaultConfigFile)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func addFiles(cmd *cobra.Command, addPath string, dryRun, errorOnAction bool) er
 
 	pw.AppendTracker(tracker)
 
-	inFilesRel, err := util.ListFilesRel(pw.Log, addPath, tracker.Increment, cfg.SkipPermissionDenied)
+	inFilesRel, err := vault.ListFilesRel(pw.Log, addPath, tracker.Increment, cfg.SkipPermissionDenied)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func addFiles(cmd *cobra.Command, addPath string, dryRun, errorOnAction bool) er
 
 	pw.AppendTracker(tracker)
 
-	inFilesRel = util.FilterIgnore(inFilesRel, cfg.Ignore, tracker.Increment)
+	inFilesRel = vault.FilterIgnore(inFilesRel, cfg.Ignore, tracker.Increment)
 
 	tracker.MarkAsDone()
 
@@ -102,7 +102,7 @@ func addFiles(cmd *cobra.Command, addPath string, dryRun, errorOnAction bool) er
 
 	pw.Log("Linking sidecar files")
 
-	inFilesRelLinked := util.LinkSidecars(cfg.SidecarExtensions, inFilesRel)
+	inFilesRelLinked := vault.LinkSidecars(cfg.SidecarExtensions, inFilesRel)
 
 	// 4. Shuffle files
 
@@ -130,17 +130,17 @@ func addFiles(cmd *cobra.Command, addPath string, dryRun, errorOnAction bool) er
 
 	for _, f := range inFilesRelLinked {
 		// Copy main file
-		info, err := util.ExtractMetadata(et, addPath, f.Path)
+		info, err := vault.ExtractMetadata(et, addPath, f.Path)
 		if err != nil {
 			return fmt.Errorf("failed to extract metadata for %s: %w", f.Path, err)
 		}
 
-		targetPath, err := util.RenderTemplate(cfg.Template, info)
+		targetPath, err := vault.RenderTemplate(cfg.Template, info)
 		if err != nil {
 			return fmt.Errorf("failed to render template for %s: %w", f.Path, err)
 		}
 
-		err = util.SmartCopyFile(
+		err = vault.SmartCopyFile(
 			pw.Log,
 			path.Join(addPath, f.Path),
 			path.Join(libPath, targetPath),
@@ -155,9 +155,9 @@ func addFiles(cmd *cobra.Command, addPath string, dryRun, errorOnAction bool) er
 		for _, sidecar := range f.Sidecars {
 			// Use the same name as the main file, but with the sidecar extension
 			sidecarPath := replaceExtension(targetPath, filepath.Ext(sidecar))
-			err = util.SmartCopyFile(
+			err = vault.SmartCopyFile(
 				pw.Log,
-				path.Join(addPath, sidecarPath),
+				path.Join(addPath, sidecar),
 				path.Join(libPath, sidecarPath),
 				dryRun,
 				errorOnAction,

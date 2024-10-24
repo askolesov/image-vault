@@ -26,7 +26,7 @@ func GetInitCmd() *cobra.Command {
 }
 
 func ensureLibraryInitialized(cmd *cobra.Command) error {
-	cfgExists, err := util.IsConfigExists(DefaultConfigFile)
+	cfgExists, err := vault.IsConfigExists(DefaultConfigFile)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func initLibrary(cmd *cobra.Command) error {
 	}
 
 	// Write default config to file
-	err = util.WriteDefaultConfigToFile(DefaultConfigFile)
+	err = vault.WriteDefaultConfigToFile(DefaultConfigFile)
 	if err != nil {
 		return err
 	}
