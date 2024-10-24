@@ -1,6 +1,6 @@
 module github.com/askolesov/image-vault
 
-go 1.21.2
+go 1.23
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0

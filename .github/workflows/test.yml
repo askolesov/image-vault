@@ -9,6 +9,7 @@ on:
 jobs:
 
   build:
+    name: Build and test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -16,7 +17,10 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
+        go-version-file: "go.mod"
+
+    - name: Install exiftool
+      run: sudo apt-get update && sudo apt-get install -y exiftool
 
     - name: Build
       run: go build -v ./...
