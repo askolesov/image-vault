@@ -105,3 +105,51 @@ sidecarExtensions:
 ```
 
 You can modify this configuration to suit your photo organization needs. The `template` field is particularly important as it determines how your photos will be organized in the library based on their metadata.
+
+## Building from Source
+
+To build Image Vault from source:
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/askolesov/image-vault.git
+   ```
+
+2. Navigate to the project directory:
+   ```
+   cd image-vault
+   ```
+
+3. Build the project:
+   ```
+   make build
+   ```
+
+   This will create the `imv` binary in the `build/` directory.
+
+4. (Optional) Install the binary:
+   ```
+   make install
+   ```
+
+## Contributing
+
+Contributions to Image Vault are welcome! Please feel free to submit pull requests, create issues, or suggest improvements.
+
+Before submitting a pull request, please ensure that:
+
+1. Your code passes all tests:
+   ```
+   make test
+   ```
+
+2. Your code passes the linter:
+   ```
+   make lint
+   ```
+
+3. You've added tests for any new functionality.
+
+## License
+
+// TODO: add license
