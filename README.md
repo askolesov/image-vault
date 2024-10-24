@@ -26,6 +26,26 @@ go install github.com/askolesov/image-vault/cmd/imv@latest
 
 Alternatively, you can build from source (see [Building from Source](#building-from-source)).
 
+### Required Dependency
+
+Image Vault requires `exiftool` to be installed on your system for handling photo metadata. Below are instructions for installing `exiftool` on different operating systems:
+
+#### Linux
+
+To install `exiftool` on Linux, you can use the package manager for your distribution. For example, on Ubuntu, you can use:
+
+```
+sudo apt install libimage-exiftool-perl
+```
+
+#### Windows
+
+To install `exiftool` on Windows using Homebrew, first ensure you have Homebrew installed, then run:
+
+```
+brew install exiftool
+```
+
 ## Usage
 
 Image Vault offers several commands to manage your photo library efficiently. Here are the main commands and their usage:
