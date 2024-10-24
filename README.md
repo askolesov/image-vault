@@ -173,7 +173,3 @@ Before submitting a pull request, please ensure that:
    ```
 
 3. You've added tests for any new functionality.
-
-## License
-
-// TODO: add license
