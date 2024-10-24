@@ -43,3 +43,9 @@ pre-push:
 	make lint
 	make test
 	make build
+
+.PHONY: test-changes
+test-changes:
+	git diff --name-only --cached --diff-filter=ACM | grep -E '\.go$$' | xargs -n 1 gofmt -w
+	git diff --cached --name-only --diff-filter=ACM | grep -E '\.go$$' | xargs -n 1 go vet
+	git diff --cached --name-only --diff-filter=ACM | grep -E '\.go$$' | xargs -n 1 go test -v
