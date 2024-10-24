@@ -123,9 +123,9 @@ ignore:
   - .*
 
 sidecarExtensions:
-  - "*.xmp"
-  - "*.yaml"
-  - "*.json"
+  - ".xmp"
+  - ".yaml"
+  - ".json"
 ```
 
 You can modify this configuration to suit your photo organization needs. The `template` field is particularly important as it determines how your photos will be organized in the library based on their metadata.
