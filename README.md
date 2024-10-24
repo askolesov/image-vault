@@ -1,5 +1,8 @@
 # Image Vault
 
+[![Lint](https://github.com/askolesov/image-vault/actions/workflows/lint.yaml/badge.svg)](https://github.com/askolesov/image-vault/actions/workflows/lint.yaml)
+[![Test](https://github.com/askolesov/image-vault/actions/workflows/test.yaml/badge.svg)](https://github.com/askolesov/image-vault/actions/workflows/test.yaml)
+
 Image Vault is a powerful command-line tool specifically designed for managing and organizing photo libraries. It provides photographers and photo enthusiasts with features for initializing photo libraries, adding and organizing image files, verifying library integrity, and displaying detailed photo metadata.
 
 ## Table of Contents
