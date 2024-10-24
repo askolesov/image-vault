@@ -18,6 +18,9 @@ jobs:
       with:
         go-version-file: "go.mod"
 
+    - name: Install exiftool
+      run: apt-get update && apt-get install -y exiftool
+
     - name: Build
       run: go build -v ./...
 
