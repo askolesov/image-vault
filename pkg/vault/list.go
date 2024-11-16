@@ -24,7 +24,9 @@ func ListFilesRel(log func(string, ...any), root string, progressCb func(int64),
 				return err
 			}
 			files = append(files, relPath)
-			progressCb(1)
+			if progressCb != nil {
+				progressCb(1)
+			}
 		}
 
 		return nil

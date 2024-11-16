@@ -19,46 +19,46 @@ import (
 // - Returns an error if the target is a directory.
 // - Performs the actual copy operation if all checks pass.
 // The function respects dryRun and errorOnAction flags for safety and logging purposes.
-func SmartCopyFile(log func(string, ...any), source, target string, dryRun, errorOnAction bool) error {
+func SmartCopyFile(log func(string, ...any), source, target string, dryRun, errorOnAction bool) (skipped bool, err error) {
 	if source == target {
 		log("Skipping copy, source and target are the same: source=%s, target=%s", source, target)
-		return nil
+		return true, nil
 	}
 
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
-		return fmt.Errorf("failed to stat source file: %w", err)
+		return false, fmt.Errorf("failed to stat source file: %w", err)
 	}
 	if sourceInfo.IsDir() {
-		return errors.New("source is a directory")
+		return false, errors.New("source is a directory")
 	}
 
 	targetInfo, err := os.Stat(target)
 	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to stat target file: %w", err)
+		return false, fmt.Errorf("failed to stat target file: %w", err)
 	}
 
 	if targetInfo != nil {
 		if targetInfo.IsDir() {
-			return errors.New("target is a directory")
+			return false, errors.New("target is a directory")
 		}
 
 		same, err := CompareFiles(source, target)
 		if err != nil {
-			return fmt.Errorf("failed to compare files: %w", err)
+			return false, fmt.Errorf("failed to compare files: %w", err)
 		}
 
 		if same {
 			log("Skipping copy, same file found: source=%s, target=%s", source, target)
-			return nil
+			return true, nil
 		}
 
 		if err := removeTarget(log, target, dryRun, errorOnAction); err != nil {
-			return err
+			return false, err
 		}
 	}
 
-	return performCopy(log, source, target, dryRun, errorOnAction)
+	return false, performCopy(log, source, target, dryRun, errorOnAction)
 }
 
 func removeTarget(log func(string, ...any), target string, dryRun, errorOnAction bool) error {

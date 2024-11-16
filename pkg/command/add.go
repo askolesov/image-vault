@@ -1,22 +1,16 @@
 package command
 
 import (
-	"fmt"
-	"math/rand"
 	"os"
 	"path"
-	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/askolesov/image-vault/pkg/vault"
-	"github.com/barasher/go-exiftool"
-	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/spf13/cobra"
 )
 
 func GetAddCmd() *cobra.Command {
 	var dryRun bool
+	var errorOnAction bool
 
 	res := &cobra.Command{
 		Use:   "add",
@@ -29,160 +23,28 @@ func GetAddCmd() *cobra.Command {
 				return err
 			}
 
-			// Add files
-			return addFiles(cmd, args[0], dryRun, false)
+			libPath, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+
+			addPath := args[0]
+
+			cfgPath := path.Join(libPath, DefaultConfigFile)
+
+			err = ProcessFiles(cmd, cfgPath, addPath, libPath, func(log func(string, ...any), source, target string, isPrimary bool) (skipped bool, err error) {
+				return vault.SmartCopyFile(log, source, target, dryRun, errorOnAction)
+			})
+			if err != nil {
+				return err
+			}
+
+			return nil
 		},
 	}
 
 	res.Flags().BoolVar(&dryRun, "dry-run", false, "dry run")
+	res.Flags().BoolVar(&errorOnAction, "error-on-action", false, "error on action")
 
 	return res
-}
-
-func addFiles(cmd *cobra.Command, addPath string, dryRun, errorOnAction bool) error {
-	// Get library path
-	libPath, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	// Get exiftool
-	et, err := exiftool.NewExiftool()
-	if err != nil {
-		return err
-	}
-
-	// Load config
-	cfg, err := vault.ReadConfigFromFile(DefaultConfigFile)
-	if err != nil {
-		return err
-	}
-
-	cfgJson, err := cfg.JSON()
-	if err != nil {
-		return err
-	}
-
-	cmd.Printf("Loaded config: %s\n", cfgJson)
-
-	// Create progress writer
-	pw := progress.NewWriter()
-	go pw.Render()
-	defer pw.Stop()
-
-	// 1. List files
-
-	tracker := &progress.Tracker{
-		Message: "Building file list",
-	}
-
-	pw.AppendTracker(tracker)
-
-	inFilesRel, err := vault.ListFilesRel(pw.Log, addPath, tracker.Increment, cfg.SkipPermissionDenied)
-	if err != nil {
-		return err
-	}
-
-	tracker.MarkAsDone()
-
-	// 2. Filter files
-
-	tracker = &progress.Tracker{
-		Message: "Filtering files",
-		Total:   int64(len(inFilesRel)),
-	}
-
-	pw.AppendTracker(tracker)
-
-	inFilesRel = vault.FilterIgnore(inFilesRel, cfg.Ignore, tracker.Increment)
-
-	tracker.MarkAsDone()
-
-	// 3. Link sidecar files
-
-	pw.Log("Linking sidecar files")
-
-	inFilesRelLinked := vault.LinkSidecars(cfg.SidecarExtensions, inFilesRel)
-
-	// 4. Shuffle files
-
-	tracker = &progress.Tracker{
-		Message: "Shuffling files",
-	}
-
-	pw.AppendTracker(tracker)
-
-	rand.Shuffle(len(inFilesRelLinked), func(i, j int) {
-		inFilesRelLinked[i], inFilesRelLinked[j] = inFilesRelLinked[j], inFilesRelLinked[i]
-		tracker.Increment(1)
-	})
-
-	tracker.MarkAsDone()
-
-	// 5. Copy files (hashing, getting extractor info will be done inside)
-
-	tracker = &progress.Tracker{
-		Message: "Copying files",
-		Total:   int64(len(inFilesRelLinked)),
-	}
-
-	pw.AppendTracker(tracker)
-
-	for _, f := range inFilesRelLinked {
-		// Copy main file
-		info, err := vault.ExtractMetadata(et, addPath, f.Path)
-		if err != nil {
-			return fmt.Errorf("failed to extract metadata for %s: %w", f.Path, err)
-		}
-
-		targetPath, err := vault.RenderTemplate(cfg.Template, info)
-		if err != nil {
-			return fmt.Errorf("failed to render template for %s: %w", f.Path, err)
-		}
-
-		err = vault.SmartCopyFile(
-			pw.Log,
-			path.Join(addPath, f.Path),
-			path.Join(libPath, targetPath),
-			dryRun,
-			errorOnAction,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to copy file %s to %s: %w", f.Path, targetPath, err)
-		}
-
-		// Copy sidecar files
-		for _, sidecar := range f.Sidecars {
-			// Use the same name as the main file, but with the sidecar extension
-			sidecarPath := replaceExtension(targetPath, filepath.Ext(sidecar))
-			err = vault.SmartCopyFile(
-				pw.Log,
-				path.Join(addPath, sidecar),
-				path.Join(libPath, sidecarPath),
-				dryRun,
-				errorOnAction,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to copy sidecar file %s to %s: %w", sidecar, sidecarPath, err)
-			}
-		}
-
-		tracker.Increment(1)
-	}
-
-	tracker.MarkAsDone()
-
-	// 6. Done
-
-	pw.Log("Done")
-
-	// Add a small delay to ensure all progress updates are rendered
-	time.Sleep(1000 * time.Millisecond)
-
-	return nil
-}
-
-func replaceExtension(path string, extension string) string {
-	ext := filepath.Ext(path)
-	return strings.TrimSuffix(path, ext) + extension
 }

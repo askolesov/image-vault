@@ -1,7 +1,9 @@
 package command
 
 import (
+	"errors"
 	"os"
+	"path"
 
 	"github.com/spf13/cobra"
 )
@@ -17,14 +19,34 @@ func GetVerifyCmd() *cobra.Command {
 				return err
 			}
 
-			// Get library path
 			libPath, err := os.Getwd()
 			if err != nil {
 				return err
 			}
 
-			// Verify library
-			return addFiles(cmd, libPath, false, true)
+			addPath := args[0]
+
+			cfgPath := path.Join(libPath, DefaultConfigFile)
+
+			ok := true
+
+			err = ProcessFiles(cmd, cfgPath, addPath, libPath, func(log func(string, ...any), source, target string, isPrimary bool) (skipped bool, err error) {
+				if source != target {
+					log(source)
+					ok = false
+				}
+
+				return false, nil
+			})
+			if err != nil {
+				return err
+			}
+
+			if !ok {
+				return errors.New("library is not consistent")
+			}
+
+			return nil
 		},
 	}
 

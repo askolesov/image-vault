@@ -17,8 +17,9 @@ func TestSmartCopy(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("dry run doesn't copy", func(t *testing.T) {
-		err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), true, false)
+		skipped, err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), true, false)
 		require.NoError(t, err)
+		require.False(t, skipped)
 
 		// no target file should not be created
 		_, err = os.Stat(path.Join(tempDir, "target.txt"))
@@ -27,14 +28,15 @@ func TestSmartCopy(t *testing.T) {
 	})
 
 	t.Run("errorOnAction returns error", func(t *testing.T) {
-		err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, true)
+		_, err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, true)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "would copy file")
 	})
 
 	t.Run("copy", func(t *testing.T) {
-		err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		skipped, err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
+		require.False(t, skipped)
 
 		// target file should be created
 		_, err = os.Stat(path.Join(tempDir, "target.txt"))
@@ -47,8 +49,9 @@ func TestSmartCopy(t *testing.T) {
 	})
 
 	t.Run("skip if same content", func(t *testing.T) {
-		err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		skipped, err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
+		require.True(t, skipped)
 	})
 
 	t.Run("remove and copy if different size", func(t *testing.T) {
@@ -56,8 +59,9 @@ func TestSmartCopy(t *testing.T) {
 		err := os.WriteFile(path.Join(tempDir, "target.txt"), []byte("ta"), 0644)
 		require.NoError(t, err)
 
-		err = SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		skipped, err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
+		require.False(t, skipped)
 
 		// target file should have the same content as source file
 		targetContent, err := os.ReadFile(path.Join(tempDir, "target.txt"))
@@ -67,11 +71,12 @@ func TestSmartCopy(t *testing.T) {
 
 	t.Run("remove and copy if same size and different content	", func(t *testing.T) {
 		// create target file with same size but different content
-		err := os.WriteFile(path.Join(tempDir, "target.txt"), []byte("source"), 0644)
+		err := os.WriteFile(path.Join(tempDir, "target.txt"), []byte("sourc1"), 0644)
 		require.NoError(t, err)
 
-		err = SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
+		skipped, err := SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target.txt"), false, false)
 		require.NoError(t, err)
+		require.False(t, skipped)
 
 		// target file should have the same content as source file
 		targetContent, err := os.ReadFile(path.Join(tempDir, "target.txt"))
@@ -87,7 +92,7 @@ func TestSmartCopy(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		err = SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target"), false, false)
+		_, err = SmartCopyFile(t.Logf, sourceFile, path.Join(tempDir, "target"), false, false)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "target is a directory")
 	})
