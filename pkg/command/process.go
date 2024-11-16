@@ -107,8 +107,7 @@ func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, acti
 		targetDir,
 		inFilesRelLinked,
 		func(source, target string, isPrimary bool) error {
-			var skipped bool
-			skipped, err = action(pw.Log, source, target, isPrimary)
+			skipped, err := action(pw.Log, source, target, isPrimary)
 			processTracker.Increment(1)
 			if skipped {
 				skippedTracker.Increment(1)
@@ -118,6 +117,9 @@ func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, acti
 			return err
 		},
 	)
+	if err != nil {
+		return err
+	}
 
 	processTracker.MarkAsDone()
 	skippedTracker.MarkAsDone()

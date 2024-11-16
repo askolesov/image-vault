@@ -9,6 +9,8 @@ import (
 )
 
 func GetVerifyCmd() *cobra.Command {
+	var failFast bool
+
 	res := &cobra.Command{
 		Use:   "verify",
 		Short: "verify library integrity",
@@ -33,7 +35,12 @@ func GetVerifyCmd() *cobra.Command {
 			err = ProcessFiles(cmd, cfgPath, addPath, libPath, func(log func(string, ...any), source, target string, isPrimary bool) (skipped bool, err error) {
 				if source != target {
 					log(source)
-					ok = false
+
+					if failFast {
+						return false, errors.New("file mismatch")
+					} else {
+						ok = false
+					}
 				}
 
 				return false, nil
@@ -43,12 +50,14 @@ func GetVerifyCmd() *cobra.Command {
 			}
 
 			if !ok {
-				return errors.New("library is not consistent")
+				return errors.New("library is not consistent. see above for details")
 			}
 
 			return nil
 		},
 	}
+
+	res.Flags().BoolVar(&failFast, "fail-fast", false, "fail fast on first mismatch")
 
 	return res
 }
