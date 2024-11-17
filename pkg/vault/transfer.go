@@ -35,7 +35,7 @@ func TransferFile(
 
 	if sourceAbs == targetAbs {
 		log("Skip: paths identical")
-		return true, nil
+		return false, nil
 	}
 
 	sourceInfo, err := os.Stat(source)
