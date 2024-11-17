@@ -17,7 +17,7 @@ func GetRootCommand() *cobra.Command {
 	}
 
 	res.AddCommand(GetInitCmd())
-	res.AddCommand(GetAddCmd())
+	res.AddCommand(GetImportCmd())
 	res.AddCommand(GetInfoCmd())
 	res.AddCommand(GetVerifyCmd())
 	res.AddCommand(GetVersionCmd())
