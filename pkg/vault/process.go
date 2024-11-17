@@ -17,7 +17,7 @@ func ProcessFiles(
 	action func(source, target string, isPrimary bool) error,
 ) error {
 	for _, f := range files {
-		// Copy main file
+		// Process main file
 		info, err := ExtractMetadata(et, sourceDir, f.Path)
 		if err != nil {
 			return fmt.Errorf("failed to extract metadata for %s: %w", f.Path, err)
@@ -37,7 +37,7 @@ func ProcessFiles(
 			return fmt.Errorf("failed to process primary file %s: %w", f.Path, err)
 		}
 
-		// Copy sidecar files
+		// Process sidecar files
 		for _, sidecar := range f.Sidecars {
 			// Use the same name as the main file, but with the sidecar extension
 			sidecarPath := replaceExtension(primaryPath, filepath.Ext(sidecar))
