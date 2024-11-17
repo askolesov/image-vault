@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type Action func(log func(string, ...any), source, target string, isPrimary bool) (skipped bool, err error)
+type Action func(log func(string, ...any), source, target string, isPrimary bool) (actionTaken bool, err error)
 
 func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, action Action) error {
 	// Initialize exiftool
@@ -107,12 +107,12 @@ func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, acti
 		targetDir,
 		inFilesRelLinked,
 		func(source, target string, isPrimary bool) error {
-			skipped, err := action(pw.Log, source, target, isPrimary)
+			actionTaken, err := action(pw.Log, source, target, isPrimary)
 			processTracker.Increment(1)
-			if skipped {
-				skippedTracker.Increment(1)
-			} else {
+			if actionTaken {
 				processedTracker.Increment(1)
+			} else {
+				skippedTracker.Increment(1)
 			}
 			return err
 		},

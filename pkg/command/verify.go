@@ -2,13 +2,16 @@ package command
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path"
 
+	"github.com/askolesov/image-vault/pkg/vault"
 	"github.com/spf13/cobra"
 )
 
 func GetVerifyCmd() *cobra.Command {
+	var fix bool
 	var failFast bool
 
 	res := &cobra.Command{
@@ -26,25 +29,39 @@ func GetVerifyCmd() *cobra.Command {
 				return err
 			}
 
-			addPath := args[0]
-
 			cfgPath := path.Join(libPath, DefaultConfigFile)
 
 			ok := true
 
-			err = ProcessFiles(cmd, cfgPath, addPath, libPath, func(log func(string, ...any), source, target string, isPrimary bool) (skipped bool, err error) {
-				if source != target {
-					log(source)
-
-					if failFast {
-						return false, errors.New("file mismatch")
+			err = ProcessFiles(
+				cmd,
+				cfgPath,
+				libPath,
+				libPath,
+				func(log func(string, ...any), source, target string, isPrimary bool) (actionTaken bool, err error) {
+					if fix {
+						return vault.TransferFile(log, source, target, false, false, true)
 					} else {
-						ok = false
-					}
-				}
+						actionTaken, err := vault.TransferFile(log, source, target, true, false, true)
+						if err != nil {
+							return false, err
+						}
 
-				return false, nil
-			})
+						if !actionTaken {
+							return false, nil
+						}
+
+						log("Inconsistency: %s -> %s", source, target)
+
+						if failFast {
+							return false, fmt.Errorf("file inconsistency: %s -> %s", source, target)
+						} else {
+							ok = false
+							return true, nil
+						}
+					}
+				},
+			)
 			if err != nil {
 				return err
 			}
@@ -57,7 +74,8 @@ func GetVerifyCmd() *cobra.Command {
 		},
 	}
 
-	res.Flags().BoolVar(&failFast, "fail-fast", false, "fail fast on first mismatch")
+	res.Flags().BoolVar(&fix, "fix", false, "fix inconsistencies")
+	res.Flags().BoolVar(&failFast, "fail-fast", false, "fail fast on first inconsistency")
 
 	return res
 }
