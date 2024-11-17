@@ -7,6 +7,7 @@ import (
 	"github.com/askolesov/image-vault/pkg/vault"
 	"github.com/barasher/go-exiftool"
 	"github.com/jedib0t/go-pretty/v6/progress"
+	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 )
 
@@ -83,17 +84,25 @@ func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, acti
 	tracker.MarkAsDone()
 
 	// Step 5: Process and copy files
+	totalPrimaries := len(inFilesRel)
+
+	totalSidecars := lo.SumBy(inFilesRelLinked, func(f vault.FileWithSidecars) int {
+		return len(f.Sidecars)
+	})
+
+	total := totalPrimaries + totalSidecars
+
 	processTracker := &progress.Tracker{
 		Message: "Processing files",
-		Total:   int64(len(inFilesRelLinked)),
+		Total:   int64(total),
 	}
 	skippedTracker := &progress.Tracker{
 		Message: "Skipped files",
-		Total:   int64(len(inFilesRelLinked)), // Maximum possible skipped
+		Total:   int64(total), // Maximum possible skipped
 	}
 	processedTracker := &progress.Tracker{
 		Message: "Processed files",
-		Total:   int64(len(inFilesRelLinked)), // Maximum possible processed
+		Total:   int64(total), // Maximum possible processed
 	}
 
 	pw.AppendTracker(processTracker)
