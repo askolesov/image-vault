@@ -90,7 +90,7 @@ func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, acti
 	tracker.MarkAsDone()
 
 	// Step 5: Process and copy files
-	totalPrimaries := len(inFilesRel)
+	totalPrimaries := len(inFilesRelLinked)
 
 	totalSidecars := lo.SumBy(inFilesRelLinked, func(f vault.FileWithSidecars) int {
 		return len(f.Sidecars)
