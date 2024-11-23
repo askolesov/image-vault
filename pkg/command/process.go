@@ -20,6 +20,11 @@ func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, acti
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if closeErr := et.Close(); closeErr != nil {
+			cmd.Printf("failed to close exiftool: %s", closeErr.Error())
+		}
+	}()
 
 	// Load and parse configuration
 	cfg, err := vault.ReadConfigFromFile(cfgPath)
