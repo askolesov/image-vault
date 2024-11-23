@@ -96,9 +96,6 @@ func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, acti
 	mainTracker := &progress.Tracker{
 		Message: "Processing Files",
 		Total:   int64(total),
-		Units: progress.Units{
-			Notation: "files",
-		},
 	}
 
 	processed := 0
@@ -123,7 +120,7 @@ func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, acti
 			}
 
 			// Update the message to include counters
-			mainTracker.UpdateMessage(fmt.Sprintf("Processing Files (%d copied, %d skipped)", processed, skipped))
+			mainTracker.UpdateMessage(fmt.Sprintf("Processing Files (%d processed, %d skipped)", processed, skipped))
 
 			return err
 		},
