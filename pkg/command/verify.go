@@ -31,7 +31,7 @@ func GetVerifyCmd() *cobra.Command {
 
 			cfgPath := path.Join(libPath, DefaultConfigFile)
 
-			ok := true
+			inconsistencies := []string{}
 
 			err = ProcessFiles(
 				cmd,
@@ -39,6 +39,8 @@ func GetVerifyCmd() *cobra.Command {
 				libPath,
 				libPath,
 				func(log func(string, ...any), source, target string, isPrimary bool) (actionTaken bool, err error) {
+					log("Verifying: %s", source)
+
 					if fix {
 						return vault.TransferFile(log, source, target, false, false, true)
 					} else {
@@ -47,18 +49,11 @@ func GetVerifyCmd() *cobra.Command {
 							return false, err
 						}
 
-						if !actionTaken {
-							return false, nil
+						if actionTaken {
+							inconsistencies = append(inconsistencies, fmt.Sprintf("%s -> %s", source, target))
 						}
 
-						log("Inconsistency: %s -> %s", source, target)
-
-						if failFast {
-							return false, fmt.Errorf("file inconsistency: %s -> %s", source, target)
-						} else {
-							ok = false
-							return true, nil
-						}
+						return actionTaken, nil
 					}
 				},
 			)
@@ -66,8 +61,14 @@ func GetVerifyCmd() *cobra.Command {
 				return err
 			}
 
-			if !ok {
-				return errors.New("library is not consistent. see above for details")
+			if len(inconsistencies) > 0 {
+				cmd.Printf("Found %d inconsistencies:\n", len(inconsistencies))
+
+				for _, inconsistency := range inconsistencies {
+					cmd.Printf("  %s\n", inconsistency)
+				}
+
+				return errors.New("library verification failed")
 			}
 
 			return nil

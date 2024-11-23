@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"time"
 
@@ -92,22 +93,18 @@ func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, acti
 
 	total := totalPrimaries + totalSidecars
 
-	processTracker := &progress.Tracker{
-		Message: "Processing files",
+	mainTracker := &progress.Tracker{
+		Message: "Processing Files",
 		Total:   int64(total),
-	}
-	skippedTracker := &progress.Tracker{
-		Message: "Skipped files",
-		Total:   int64(total), // Maximum possible skipped
-	}
-	processedTracker := &progress.Tracker{
-		Message: "Processed files",
-		Total:   int64(total), // Maximum possible processed
+		Units: progress.Units{
+			Notation: "files",
+		},
 	}
 
-	pw.AppendTracker(processTracker)
-	pw.AppendTracker(skippedTracker)
-	pw.AppendTracker(processedTracker)
+	processed := 0
+	skipped := 0
+
+	pw.AppendTracker(mainTracker)
 
 	err = vault.ProcessFiles(
 		cfg.Template,
@@ -117,12 +114,17 @@ func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, acti
 		inFilesRelLinked,
 		func(source, target string, isPrimary bool) error {
 			actionTaken, err := action(pw.Log, source, target, isPrimary)
-			processTracker.Increment(1)
+			mainTracker.Increment(1)
+
 			if actionTaken {
-				processedTracker.Increment(1)
+				processed++
 			} else {
-				skippedTracker.Increment(1)
+				skipped++
 			}
+
+			// Update the message to include counters
+			mainTracker.UpdateMessage(fmt.Sprintf("Processing Files (%d copied, %d skipped)", processed, skipped))
+
 			return err
 		},
 	)
@@ -130,9 +132,7 @@ func ProcessFiles(cmd *cobra.Command, cfgPath, sourceDir, targetDir string, acti
 		return err
 	}
 
-	processTracker.MarkAsDone()
-	skippedTracker.MarkAsDone()
-	processedTracker.MarkAsDone()
+	mainTracker.MarkAsDone()
 
 	// Step 6: Completion
 	pw.Log("All files processed successfully")
