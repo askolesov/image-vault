@@ -9,11 +9,11 @@ Image Vault is a powerful command-line tool specifically designed for managing a
 ## TLDR
 
 ```
-mkdir Photos && cd Photos # Create a new directory for your photos
-imv init # Initialize a new photo library
-imv import <path_to_photos> # Import photos into the library
-imv verify # Verify the library integrity
-imv cleanup # Cleanup empty directories in the library
+mkdir Photos && cd Photos     # Create a new directory for your photos
+imv init                      # Initialize a new photo library
+imv import <path_to_photos>   # Import photos into the library
+imv verify --fix              # Verify the library integrity and fix any issues
+imv cleanup                   # Cleanup empty directories in the library
 ```
 
 ## Table of Contents
