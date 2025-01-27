@@ -6,6 +6,16 @@
 
 Image Vault is a powerful command-line tool specifically designed for managing and organizing photo libraries. It provides photographers and photo enthusiasts with features for initializing photo libraries, adding and organizing image files, verifying library integrity, and displaying detailed photo metadata.
 
+## TLDR
+
+```
+mkdir Photos && cd Photos # Create a new directory for your photos
+imv init # Initialize a new photo library
+imv import <path_to_photos> # Import photos into the library
+imv verify # Verify the library integrity
+imv cleanup # Cleanup empty directories in the library
+```
+
 ## Table of Contents
 
 - [Installation](#installation)
