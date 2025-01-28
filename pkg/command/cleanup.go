@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/askolesov/image-vault/pkg/vault"
@@ -32,7 +33,13 @@ func GetCleanupCmd() *cobra.Command {
 				path = libPath
 			}
 
-			return vault.Cleanup(path)
+			removedCount, err := vault.Cleanup(path)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("Removed %d empty directories\n", removedCount)
+			return nil
 		},
 	}
 
