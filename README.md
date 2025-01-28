@@ -4,7 +4,7 @@
 [![Test](https://github.com/askolesov/image-vault/actions/workflows/test.yaml/badge.svg)](https://github.com/askolesov/image-vault/actions/workflows/test.yaml)
 [![Version](https://img.shields.io/github/v/release/askolesov/image-vault?include_prereleases)](https://github.com/askolesov/image-vault/releases)
 
-Image Vault is a powerful command-line tool specifically designed for managing and organizing photo libraries. It provides photographers and photo enthusiasts with features for initializing photo libraries, adding and organizing image files, verifying library integrity, and displaying detailed photo metadata.
+Image Vault is a command-line tool designed for organizing photo libraries in a deterministic way. It calculates the path for each photo based on its metadata and a configured template. Importing the same photo multiple times will always result in the same path, so duplicate files won't be added to the library. It's also possible to check library integrity (verifying all files are in place) and fix any inconsistencies.
 
 ## TLDR
 
