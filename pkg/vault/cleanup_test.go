@@ -15,13 +15,15 @@ func TestCleanup(t *testing.T) {
 		cleanupDir    string
 		expectedDirs  []string
 		expectedError bool
+		expectedCount int
 	}{
 		{
-			name:         "Empty directory is removed",
-			setupDirs:    []string{"empty"},
-			setupFiles:   map[string]string{},
-			cleanupDir:   "empty",
-			expectedDirs: []string{},
+			name:          "Empty directory is removed",
+			setupDirs:     []string{"empty"},
+			setupFiles:    map[string]string{},
+			cleanupDir:    "empty",
+			expectedDirs:  []string{},
+			expectedCount: 1,
 		},
 		{
 			name:      "Directory with file is kept",
@@ -29,8 +31,9 @@ func TestCleanup(t *testing.T) {
 			setupFiles: map[string]string{
 				"withfile/test.txt": "content",
 			},
-			cleanupDir:   "withfile",
-			expectedDirs: []string{"withfile"},
+			cleanupDir:    "withfile",
+			expectedDirs:  []string{"withfile"},
+			expectedCount: 0,
 		},
 		{
 			name:      "Empty nested directories are removed",
@@ -38,8 +41,9 @@ func TestCleanup(t *testing.T) {
 			setupFiles: map[string]string{
 				"parent/test.txt": "content",
 			},
-			cleanupDir:   "parent",
-			expectedDirs: []string{"parent"},
+			cleanupDir:    "parent",
+			expectedDirs:  []string{"parent"},
+			expectedCount: 2,
 		},
 		{
 			name:      "Nested directories are not removed if they are not empty",
@@ -47,8 +51,9 @@ func TestCleanup(t *testing.T) {
 			setupFiles: map[string]string{
 				"parent/child/test.txt": "content",
 			},
-			cleanupDir:   "parent",
-			expectedDirs: []string{"parent", "parent/child"},
+			cleanupDir:    "parent",
+			expectedDirs:  []string{"parent", "parent/child"},
+			expectedCount: 1,
 		},
 	}
 
@@ -74,12 +79,15 @@ func TestCleanup(t *testing.T) {
 			}
 
 			// Run cleanup on the specified cleanup directory
-			err := Cleanup(filepath.Join(tempDir, tc.cleanupDir))
+			removedCount, err := Cleanup(filepath.Join(tempDir, tc.cleanupDir))
 			if tc.expectedError && err == nil {
 				t.Error("Expected an error but got none")
 			}
 			if !tc.expectedError && err != nil {
 				t.Errorf("Unexpected error: %v", err)
+			}
+			if removedCount != tc.expectedCount {
+				t.Errorf("Expected %d directories to be removed, but got %d", tc.expectedCount, removedCount)
 			}
 
 			// Check all expected directories exist
