@@ -33,7 +33,11 @@ func GetCleanupCmd() *cobra.Command {
 				path = libPath
 			}
 
-			removedCount, err := vault.Cleanup(path)
+			// Get the default config to access the ignored files
+			config := vault.DefaultConfig()
+			ignoredFiles := config.IgnoreFilesInCleanup
+
+			removedCount, err := vault.Cleanup(path, ignoredFiles)
 			if err != nil {
 				return err
 			}

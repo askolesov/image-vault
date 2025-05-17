@@ -14,6 +14,7 @@ type Config struct {
 	SkipPermissionDenied bool     `yaml:"skipPermissionDenied" json:"skipPermissionDenied"`
 	Ignore               []string `yaml:"ignore" json:"ignore"`
 	SidecarExtensions    []string `yaml:"sidecarExtensions" json:"sidecarExtensions"`
+	IgnoreFilesInCleanup []string `yaml:"ignoreFilesInCleanup" json:"ignoreFilesInCleanup"`
 }
 
 const (
@@ -38,14 +39,18 @@ skipPermissionDenied: true
 
 # ignore: List of file paths to ignore (supports .gitignore patterns).
 ignore:
-  - image-vault.yaml
-  - .*
+  - "image-vault.yaml"
+  - ".*"
 
 # sidecarExtensions: List of file extensions for sidecar files.
 sidecarExtensions:
   - ".xmp"
   - ".yaml"
   - ".json"
+
+# ignoreFilesInCleanup: List of files to ignore when determining if a directory is empty during cleanup.
+ignoreFilesInCleanup:
+  - ".DS_Store"
 `
 )
 

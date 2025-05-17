@@ -12,15 +12,64 @@ func TestCleanup(t *testing.T) {
 		name          string
 		setupDirs     []string
 		setupFiles    map[string]string
+		ignoredFiles  []string
 		cleanupDir    string
 		expectedDirs  []string
 		expectedError bool
 		expectedCount int
 	}{
+		// Test for directory with only .DS_Store file
+		{
+			name:          "Directory with only .DS_Store is removed",
+			setupDirs:     []string{"withdsstore"},
+			setupFiles:    map[string]string{"withdsstore/.DS_Store": "content"},
+			ignoredFiles:  []string{".DS_Store"},
+			cleanupDir:    "withdsstore",
+			expectedDirs:  []string{},
+			expectedCount: 1,
+		},
+		// Test for directory with only custom ignorable files
+		{
+			name:          "Directory with only custom ignorable files is removed",
+			setupDirs:     []string{"withcustomignore"},
+			setupFiles:    map[string]string{"withcustomignore/custom-ignore.txt": "content", "withcustomignore/.hidden": "content"},
+			ignoredFiles:  []string{"custom-ignore.txt", ".hidden"},
+			cleanupDir:    "withcustomignore",
+			expectedDirs:  []string{},
+			expectedCount: 1,
+		},
+		// Test for nested directories with only ignorable files
+		{
+			name:      "Nested directories with only .DS_Store are removed",
+			setupDirs: []string{"parent", "parent/child", "parent/child/empty"},
+			setupFiles: map[string]string{
+				"parent/test.txt":              "content", // This file keeps parent directory
+				"parent/child/.DS_Store":       "content",
+				"parent/child/empty/.DS_Store": "content",
+			},
+			ignoredFiles:  []string{".DS_Store"},
+			cleanupDir:    "parent",
+			expectedDirs:  []string{"parent"},
+			expectedCount: 2, // child and empty directories should be removed
+		},
+		// Test for directory with both ignorable and non-ignorable files
+		{
+			name:      "Directory with both .DS_Store and non-ignorable files is kept",
+			setupDirs: []string{"mixedfiles"},
+			setupFiles: map[string]string{
+				"mixedfiles/regular.txt": "content", // Non-ignorable file
+				"mixedfiles/.DS_Store":   "content", // Ignorable file
+			},
+			ignoredFiles:  []string{".DS_Store"},
+			cleanupDir:    "mixedfiles",
+			expectedDirs:  []string{"mixedfiles"},
+			expectedCount: 0,
+		},
 		{
 			name:          "Empty directory is removed",
 			setupDirs:     []string{"empty"},
 			setupFiles:    map[string]string{},
+			ignoredFiles:  []string{".DS_Store"},
 			cleanupDir:    "empty",
 			expectedDirs:  []string{},
 			expectedCount: 1,
@@ -31,6 +80,7 @@ func TestCleanup(t *testing.T) {
 			setupFiles: map[string]string{
 				"withfile/test.txt": "content",
 			},
+			ignoredFiles:  []string{".DS_Store"},
 			cleanupDir:    "withfile",
 			expectedDirs:  []string{"withfile"},
 			expectedCount: 0,
@@ -41,6 +91,7 @@ func TestCleanup(t *testing.T) {
 			setupFiles: map[string]string{
 				"parent/test.txt": "content",
 			},
+			ignoredFiles:  []string{".DS_Store"},
 			cleanupDir:    "parent",
 			expectedDirs:  []string{"parent"},
 			expectedCount: 2,
@@ -51,6 +102,7 @@ func TestCleanup(t *testing.T) {
 			setupFiles: map[string]string{
 				"parent/child/test.txt": "content",
 			},
+			ignoredFiles:  []string{".DS_Store"},
 			cleanupDir:    "parent",
 			expectedDirs:  []string{"parent", "parent/child"},
 			expectedCount: 1,
@@ -78,8 +130,8 @@ func TestCleanup(t *testing.T) {
 				}
 			}
 
-			// Run cleanup on the specified cleanup directory
-			removedCount, err := Cleanup(filepath.Join(tempDir, tc.cleanupDir))
+			// Run cleanup on the specified cleanup directory with the provided ignored files
+			removedCount, err := Cleanup(filepath.Join(tempDir, tc.cleanupDir), tc.ignoredFiles)
 			if tc.expectedError && err == nil {
 				t.Error("Expected an error but got none")
 			}
@@ -102,8 +154,20 @@ func TestCleanup(t *testing.T) {
 				}
 			}
 
-			// Check all files are in place
+			// Check all non-ignorable files are in place
 			for path, expectedContent := range tc.setupFiles {
+				// Skip checking ignorable files as they might have been removed
+				isIgnorable := false
+				for _, ignoreFile := range tc.ignoredFiles {
+					if filepath.Base(path) == ignoreFile {
+						isIgnorable = true
+						break
+					}
+				}
+				if isIgnorable {
+					continue
+				}
+
 				content, err := os.ReadFile(filepath.Join(tempDir, path))
 				if err != nil {
 					t.Fatalf("Failed to read file: %v", err)
