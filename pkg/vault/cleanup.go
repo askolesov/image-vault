@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 )
 
 // Cleanup removes all empty directories in the given path recursively.
-func Cleanup(path string) (int, error) {
+// A directory is considered empty if it contains no files or only files listed in the ignoredFiles parameter.
+// If ignoredFiles is nil, no files are ignored.
+func Cleanup(path string, ignoredFiles []string) (int, error) {
 	// Get info about the path
 	info, err := os.Stat(path)
 	if err != nil {
@@ -31,7 +34,7 @@ func Cleanup(path string) (int, error) {
 	for _, entry := range entries {
 		subPath := filepath.Join(path, entry.Name())
 		if entry.IsDir() {
-			removed, err := Cleanup(subPath)
+			removed, err := Cleanup(subPath, ignoredFiles)
 			if err != nil {
 				return 0, err
 			}
@@ -39,17 +42,45 @@ func Cleanup(path string) (int, error) {
 		}
 	}
 
-	// Check if directory is empty after cleanup
+	// Check if directory is empty after cleanup (some dirs may be removed)
 	entries, err = os.ReadDir(path)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read directory: %w", err)
 	}
 
-	// Remove if empty
-	if len(entries) == 0 {
+	// Check if directory contains only ignorable files
+	isEmpty := true
+	for _, entry := range entries {
+		// If it's a directory, the current directory is not empty
+		if entry.IsDir() {
+			isEmpty = false
+			break
+		}
+
+		// Check if the file is in the ignore list
+		isIgnorable := slices.Contains(ignoredFiles, entry.Name())
+
+		// If the file is not ignorable, the directory is not empty
+		if !isIgnorable {
+			isEmpty = false
+			break
+		}
+	}
+
+	// Remove if empty or contains only ignorable files
+	if isEmpty {
+		// First, remove any ignorable files
+		for _, entry := range entries {
+			err := os.Remove(filepath.Join(path, entry.Name()))
+			if err != nil {
+				return removedCount, fmt.Errorf("failed to remove ignorable file: %w", err)
+			}
+		}
+
+		// Then remove the directory
 		err := os.Remove(path)
 		if err != nil {
-			return 0, fmt.Errorf("failed to remove empty directory: %w", err)
+			return removedCount, fmt.Errorf("failed to remove empty directory: %w", err)
 		}
 		removedCount++
 	}

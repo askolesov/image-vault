@@ -13,7 +13,7 @@ mkdir Photos && cd Photos     # Create a new directory for your photos
 imv init                      # Initialize a new photo library
 imv import <path_to_photos>   # Import photos into the library
 imv verify --fix              # Verify the library integrity and fix any issues
-imv cleanup                   # Cleanup empty directories in the library
+imv cleanup                   # Clean up empty directories in the library
 ```
 
 ## Table of Contents
@@ -21,8 +21,9 @@ imv cleanup                   # Cleanup empty directories in the library
 - [Installation](#installation)
 - [Usage](#usage)
   - [Initializing a Photo Library](#initializing-a-photo-library)
-  - [Adding Photos](#adding-photos)
+  - [Importing Photos](#importing-photos)
   - [Verifying Photo Library Integrity](#verifying-photo-library-integrity)
+  - [Cleaning Up Empty Directories](#cleaning-up-empty-directories)
   - [Displaying Photo Metadata](#displaying-photo-metadata)
   - [Showing Version Information](#showing-version-information)
 - [Configuration](#configuration)
@@ -52,13 +53,27 @@ To install `exiftool` on Linux, you can use the package manager for your distrib
 sudo apt install libimage-exiftool-perl
 ```
 
-#### Windows
+#### macOS
 
-To install `exiftool` on Windows using Homebrew, first ensure you have Homebrew installed, then run:
+To install `exiftool` on macOS using Homebrew, first ensure you have Homebrew installed, then run:
 
 ```
 brew install exiftool
 ```
+
+#### Windows
+
+To install `exiftool` on Windows, you can:
+
+1. Download the Windows executable from the [official ExifTool website](https://exiftool.org/)
+2. Or use Chocolatey package manager:
+   ```
+   choco install exiftool
+   ```
+3. Or use Scoop package manager:
+   ```
+   scoop install exiftool
+   ```
 
 ## Usage
 
@@ -74,15 +89,15 @@ imv init
 
 This command creates a configuration file (`image-vault.yaml`) in the current directory, setting up the structure for your photo organization.
 
-### Adding Photos
+### Importing Photos
 
-To add photos to your library:
+To import photos into your library:
 
 ```
-imv add <path_to_photos>
+imv import <path_to_photos>
 ```
 
-This command processes the photos at the specified path, organizes them according to the configured template (which can include metadata like date taken, camera model, etc.), and adds them to the library.
+This command processes the photos at the specified path, organizes them according to the configured template (which can include metadata like date taken, camera model, etc.), and imports them into the library.
 
 ### Verifying Photo Library Integrity
 
@@ -93,6 +108,22 @@ imv verify
 ```
 
 This command checks all photos in the library to ensure they are properly organized and match their expected locations based on their metadata and the configured template.
+
+To verify and automatically fix any issues found:
+
+```
+imv verify --fix
+```
+
+### Cleaning Up Empty Directories
+
+To clean up empty directories in your photo library:
+
+```
+imv cleanup
+```
+
+This command removes empty directories that may have been left behind after moving or reorganizing photos, helping to keep your library structure clean and organized.
 
 ### Displaying Photo Metadata
 
@@ -117,6 +148,13 @@ imv version
 Image Vault uses a YAML configuration file (`image-vault.yaml`) to customize its behavior. Here's an example of the default configuration:
 
 ```yaml
+# The template below forms the target path where images will be imported.
+# It creates a structured directory based on image metadata and file information.
+
+# template: Supports Go template syntax and Sprig functions.
+# Available namespaces: fs, exif, hash
+# For more details, run: image-vault info <file>
+
 template: |-
   {{- $make := or .Exif.Make .Exif.DeviceManufacturer "NoMake" -}}
   {{- $model := or .Exif.Model .Exif.DeviceModelName "NoModel" -}}
@@ -126,16 +164,23 @@ template: |-
   {{- $mimeType := .Exif.MIMEType | default "unknown/unknown" | splitList "/" | first -}}
   {{$make}} {{$model}} ({{$mimeType}})/{{$date | date "2006"}}/{{$date | date "2006-01-02"}}/{{$date | date "2006-01-02_15-04-05"}}_{{.Hash.Md5Short}}{{.Fs.Ext | lower}}
 
+# skipPermissionDenied: Controls whether to skip files and directories with permission denied errors.
 skipPermissionDenied: true
 
+# ignore: List of file paths to ignore (supports .gitignore patterns).
 ignore:
-  - image-vault.yaml
-  - .*
+  - "image-vault.yaml"
+  - ".*"
 
+# sidecarExtensions: List of file extensions for sidecar files.
 sidecarExtensions:
   - ".xmp"
   - ".yaml"
   - ".json"
+
+# ignoreFilesInCleanup: List of files to ignore when determining if a directory is empty during cleanup.
+ignoreFilesInCleanup:
+  - ".DS_Store"
 ```
 
 You can modify this configuration to suit your photo organization needs. The `template` field is particularly important as it determines how your photos will be organized in the library based on their metadata.
