@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+CODE_OF_CONDUCT.md
+LICENSE
+
+# Build artifacts
+build/
+imv
+
+# Test files
+*_test.go
+testdata/
+
+# Development files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# GitHub workflows (not needed in container)
+.github/
+
+# Sample data files
+*.json
+help_*.txt
+
+# Docker files
+Dockerfile
+.dockerignore
