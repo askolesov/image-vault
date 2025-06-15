@@ -29,8 +29,8 @@ RUN apk add --no-cache \
     tzdata
 
 # Create non-root user
-RUN addgroup -g 1001 -S imv && \
-    adduser -u 1001 -S imv -G imv
+RUN addgroup -g 1000 -S imv && \
+    adduser -u 1000 -S imv -G imv
 
 # Copy binary from builder stage
 COPY --from=builder /app/build/imv /usr/local/bin/imv
