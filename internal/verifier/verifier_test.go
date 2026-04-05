@@ -307,11 +307,26 @@ func TestVerifyHashMismatch(t *testing.T) {
 	// Write DIFFERENT content to the file at that path — simulating content corruption
 	createTestFile(t, filePath, "corrupted-content")
 
-	// The extractor returns the same metadata (path is correct), but ComputeFileHash will
-	// return the hash of the corrupted content, which won't match origShort in the filename.
+	// Compute the hash of the corrupted content — this is what Extract would return
+	corruptFull, corruptShort, err := metadata.ComputeFileHash(filePath, hasher)
+	require.NoError(t, err)
+
+	// The extractor returns metadata with the corrupted content's hash
+	// (simulating what real Extract does — it hashes the actual file)
+	corruptMd := &metadata.FileMetadata{
+		Extension: ".jpg",
+		Make:      "TestMake",
+		Model:     "TestModel",
+		DateTime:  dt,
+		MIMEType:  "image/jpeg",
+		MediaType: defaults.MediaTypePhoto,
+		FullHash:  corruptFull,
+		ShortHash: corruptShort,
+	}
+
 	ext := &fakeExtractor{
 		results: map[string]*metadata.FileMetadata{
-			filePath: md,
+			filePath: corruptMd,
 		},
 	}
 
@@ -362,9 +377,13 @@ func TestVerifyHashMismatchFix(t *testing.T) {
 	newContent := "new-corrupted-content-fix"
 	createTestFile(t, filePath, newContent)
 
-	// The extractor must return metadata with the ORIGINAL short hash
-	// so that the expected path matches the actual path (entering hash-check branch).
-	// But the actual content hash computed by ComputeFileHash will differ.
+	// Compute hash of the corrupted content — this is what Extract would return
+	corruptFull, corruptShort, err := metadata.ComputeFileHash(filePath, hasher)
+	require.NoError(t, err)
+
+	// The extractor returns the corrupted content's hash (what real Extract does).
+	// The path built from this metadata will differ from the current path (different hash),
+	// so the file gets moved to the correct location with the new hash in the filename.
 	ext := &fakeExtractor{
 		results: map[string]*metadata.FileMetadata{
 			filePath: {
@@ -375,8 +394,8 @@ func TestVerifyHashMismatchFix(t *testing.T) {
 				DateTime:  dt,
 				MIMEType:  "image/jpeg",
 				MediaType: defaults.MediaTypePhoto,
-				FullHash:  origFull,
-				ShortHash: origShort,
+				FullHash:  corruptFull,
+				ShortHash: corruptShort,
 			},
 		},
 	}
@@ -391,13 +410,8 @@ func TestVerifyHashMismatchFix(t *testing.T) {
 	v := New(cfg, ext, newTestLogger())
 	result, err := v.Verify()
 	require.NoError(t, err)
-	// Hash mismatch detected, fix attempted
 	assert.Equal(t, 1, result.Inconsistent)
-	// Fix will try to move to the "correct" path which is the SAME path (since metadata has origShort)
-	// Actually the fix re-builds the path from md which has origShort → same path → transfer.TransferFile
-	// will return ActionSkipped since source==target. Let's check the actual counts.
-	// Since the fix moves to same path, it will be skipped by transfer, so Fixed won't increment.
-	// This tests the hash mismatch detection + fix attempt code path.
+	assert.Equal(t, 1, result.Fixed)
 }
 
 // errExtractor returns an error for all Extract calls.

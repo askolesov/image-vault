@@ -173,7 +173,7 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, result *Result) error
 		}
 
 		if absActual == absExpected {
-			// Path matches — verify hash
+			// Path matches — verify hash in filename against content hash (already computed by Extract)
 			parsed, err := pathbuilder.ParseSourceFilename(baseName)
 			if err != nil {
 				result.Errors++
@@ -181,17 +181,9 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, result *Result) error
 				continue
 			}
 
-			// Compute actual content hash
-			_, actualShort, err := metadata.ComputeFileHash(filePath, v.hasher)
-			if err != nil {
-				result.Errors++
-				v.logger.Error("compute hash for %s: %v", filePath, err)
-				continue
-			}
-
-			if parsed.Hash != actualShort {
+			if parsed.Hash != md.ShortHash {
 				result.Inconsistent++
-				v.logger.Warn("hash mismatch for %s: filename has %s, content has %s", filePath, parsed.Hash, actualShort)
+				v.logger.Warn("hash mismatch for %s: filename has %s, content has %s", filePath, parsed.Hash, md.ShortHash)
 				if v.cfg.Fix {
 					// Re-build correct filename and move
 					correctRel := pathbuilder.BuildSourcePath(md, pbOpts)
