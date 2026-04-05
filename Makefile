@@ -8,10 +8,10 @@ COMMIT_HASH ?= $(shell git rev-parse --short HEAD 2>/dev/null)
 BUILD_DATE ?= $(shell date +%FT%T%z)
 
 GOARGS += -v
-LDFLAGS += -s -w -X ${MODULE}/pkg/buildinfo.version=${VERSION} \
-	-X ${MODULE}/pkg/buildinfo.commitHash=${COMMIT_HASH} \
-	-X ${MODULE}/pkg/buildinfo.buildDate=${BUILD_DATE} \
-	-X ${MODULE}/pkg/buildinfo.branch=${BRANCH}
+LDFLAGS += -s -w -X ${MODULE}/internal/buildinfo.version=${VERSION} \
+	-X ${MODULE}/internal/buildinfo.commitHash=${COMMIT_HASH} \
+	-X ${MODULE}/internal/buildinfo.buildDate=${BUILD_DATE} \
+	-X ${MODULE}/internal/buildinfo.branch=${BRANCH}
 
 .PHONY: run
 run:
