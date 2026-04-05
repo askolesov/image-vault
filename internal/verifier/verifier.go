@@ -108,7 +108,8 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, result *Result) error
 
 	total := len(files)
 	for i, filePath := range files {
-		v.logger.Progress(i+1, total, filePath)
+		stats := fmt.Sprintf("valid:%d fixed:%d inconsistent:%d", result.Verified, result.Fixed, result.Inconsistent)
+		v.logger.ProgressWithStats(i+1, total, stats, filePath)
 
 		baseName := filepath.Base(filePath)
 
