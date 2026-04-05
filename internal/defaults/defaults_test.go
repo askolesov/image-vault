@@ -141,3 +141,13 @@ func TestMediaTypeConstants(t *testing.T) {
 	assert.Equal(t, MediaType("audio"), MediaTypeAudio)
 	assert.Equal(t, MediaType("other"), MediaTypeOther)
 }
+
+func TestIsSupportedMediaType(t *testing.T) {
+	assert.True(t, IsSupportedMediaType(MediaTypePhoto))
+	assert.True(t, IsSupportedMediaType(MediaTypeVideo))
+	assert.True(t, IsSupportedMediaType(MediaTypeAudio))
+	assert.False(t, IsSupportedMediaType(MediaTypeOther))
+	assert.False(t, IsSupportedMediaType(MediaType("text")))
+	assert.False(t, IsSupportedMediaType(MediaType("application")))
+	assert.False(t, IsSupportedMediaType(MediaType("")))
+}

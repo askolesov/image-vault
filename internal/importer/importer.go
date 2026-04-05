@@ -101,8 +101,8 @@ func (imp *Importer) importFile(g fileWithSidecars, result *Result) error {
 		return fmt.Errorf("extract metadata: %w", err)
 	}
 
-	// Drop non-media files unless KeepAll
-	if md.MediaType == defaults.MediaTypeOther && !imp.cfg.KeepAll {
+	// Drop unsupported media types unless KeepAll
+	if !defaults.IsSupportedMediaType(md.MediaType) && !imp.cfg.KeepAll {
 		result.Dropped++
 		return nil
 	}

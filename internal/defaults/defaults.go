@@ -83,6 +83,16 @@ func MediaTypeFromMIME(mime string) MediaType {
 	}
 }
 
+// IsSupportedMediaType returns true if the media type is in the allowlist (image, video, audio).
+func IsSupportedMediaType(mt MediaType) bool {
+	switch mt {
+	case MediaTypePhoto, MediaTypeVideo, MediaTypeAudio:
+		return true
+	default:
+		return false
+	}
+}
+
 // MakeNormalization maps raw camera make strings to normalized values.
 var MakeNormalization = map[string]string{}
 

@@ -46,7 +46,7 @@ The library is convention-based — no config files, no init command. The tool r
 - **Processed directories:** `YYYY-MM-DD <event name>` — strictly one space between date and name
 - **Sidecars:** same base name as primary file, sit next to it
 - **Unknown device:** files with no EXIF make/model go to `Unknown (<media-type>)/`
-- **Media filter:** only photo, video, audio imported by default. Others dropped unless `--keep-all`.
+- **Media filter:** only `image/`, `video/`, `audio/` MIME types are supported. Files with any other MIME type (e.g., `application/`, `text/`) are dropped unless `--keep-all`.
 - **Video separation:** videos are separated into their own device directory by default (e.g., `Apple iPhone 15 Pro (video)/`). Use `--no-separate-video` on import to merge videos into the same device dir as images.
 - **Missing EXIF datetime:** falls back to zero time (1970-01-01) for determinism. The file is still imported, not dropped.
 - **Missing EXIF make/model:** file goes to `Unknown (<media-type>)/`.
@@ -144,7 +144,7 @@ Per-file pipeline — no batching, keeps memory flat for 3TB+ libraries:
 
 1. **Enumerate** source directory recursively, skip OS junk files (from `defaults`)
 2. **Extract metadata** for each file: EXIF (make, model, datetime, mime type), filesystem info, hash
-3. **Classify** media type from MIME: photo, video, audio, or other. Drop "other" unless `--keep-all`
+3. **Classify** media type from MIME prefix (`image/`, `video/`, `audio/`). Drop files with unsupported MIME types unless `--keep-all`
 4. **Normalize** make/model through normalization maps in `defaults`
 5. **Build destination path** deterministically: `<library>/<year>/sources/<Make Model (type)>/<date>/<datetime_hash.ext>`
 6. **Check destination:**
@@ -158,7 +158,7 @@ Per-file pipeline — no batching, keeps memory flat for 3TB+ libraries:
 
 - `--move` — move instead of copy (default: copy)
 - `--dry-run` — show what would happen
-- `--keep-all` — don't drop non-media files
+- `--keep-all` — import files with unsupported MIME types too
 - `--year 2025` — only import files from this year (based on EXIF datetime)
 - `--no-fail-fast` — collect all errors instead of stopping at first
 - `--no-separate-video` — put videos in the same device dir as photos
