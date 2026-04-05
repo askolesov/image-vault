@@ -697,3 +697,140 @@ func TestVerifyFastModeSkipsHashCheck(t *testing.T) {
 	assert.Equal(t, 1, result.Verified)
 	assert.Equal(t, 0, result.Inconsistent)
 }
+
+// --- Structure validation tests ---
+
+func TestVerifyLibraryRootUnexpectedFile(t *testing.T) {
+	libDir := t.TempDir()
+	createTestFile(t, filepath.Join(libDir, "stray-file.txt"), "data")
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Inconsistent)
+}
+
+func TestVerifyLibraryRootUnexpectedDir(t *testing.T) {
+	libDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "not-a-year"), 0o755))
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Inconsistent)
+}
+
+func TestVerifyYearLevelUnexpectedEntries(t *testing.T) {
+	libDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "random-dir"), 0o755))
+	createTestFile(t, filepath.Join(libDir, "2024", "stray.txt"), "data")
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Inconsistent)
+}
+
+func TestVerifySourcesUnexpectedFile(t *testing.T) {
+	libDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
+	createTestFile(t, filepath.Join(libDir, "2024", "sources", "stray.txt"), "data")
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	// Flagged twice: structure check + file verification
+	assert.GreaterOrEqual(t, result.Inconsistent, 1)
+}
+
+func TestVerifySourcesInvalidDeviceDir(t *testing.T) {
+	libDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources", "bad-device-name"), 0o755))
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Inconsistent)
+}
+
+func TestVerifyDeviceDirUnexpectedFile(t *testing.T) {
+	libDir := t.TempDir()
+	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)")
+	require.NoError(t, os.MkdirAll(deviceDir, 0o755))
+	createTestFile(t, filepath.Join(deviceDir, "stray.txt"), "data")
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	// Flagged twice: structure check + file verification
+	assert.GreaterOrEqual(t, result.Inconsistent, 1)
+}
+
+func TestVerifyDeviceDirInvalidDateDir(t *testing.T) {
+	libDir := t.TempDir()
+	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)")
+	require.NoError(t, os.MkdirAll(filepath.Join(deviceDir, "not-a-date"), 0o755))
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Inconsistent)
+}
+
+func TestVerifyProcessedUnexpectedFile(t *testing.T) {
+	libDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "processed"), 0o755))
+	createTestFile(t, filepath.Join(libDir, "2024", "processed", "stray.txt"), "data")
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Inconsistent)
+}
+
+func TestVerifyCleanLibraryNoInconsistencies(t *testing.T) {
+	libDir := t.TempDir()
+	content := "valid image"
+	hasher := mustHasher("md5")
+	tmpPath := filepath.Join(libDir, "tmp.dat")
+	createTestFile(t, tmpPath, content)
+	_, shortHash, err := metadata.ComputeFileHash(tmpPath, hasher)
+	require.NoError(t, err)
+	os.Remove(tmpPath)
+
+	filename := fmt.Sprintf("2024-01-15_12-00-00_%s.jpg", shortHash)
+	createTestFile(t, filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", filename), content)
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "processed", "2024-01-15 Birthday"), 0o755))
+
+	v := New(Config{LibraryPath: libDir, SeparateVideo: true, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Verified)
+	assert.Equal(t, 0, result.Inconsistent)
+}
+
+func TestVerifyIgnoredFilesSkippedAtAllLevels(t *testing.T) {
+	libDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
+	createTestFile(t, filepath.Join(libDir, ".DS_Store"), "")
+	createTestFile(t, filepath.Join(libDir, "2024", ".DS_Store"), "")
+	createTestFile(t, filepath.Join(libDir, "2024", "sources", ".DS_Store"), "")
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.Inconsistent)
+}

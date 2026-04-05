@@ -294,3 +294,58 @@ func TestParseSourceFilename(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateDeviceDir(t *testing.T) {
+	tests := []struct {
+		name  string
+		dir   string
+		valid bool
+	}{
+		{"full image", "Apple iPhone 15 Pro (image)", true},
+		{"full video", "Apple iPhone 15 Pro (video)", true},
+		{"full audio", "Zoom H6 (audio)", true},
+		{"no model", "Unknown (image)", true},
+		{"no type", "Apple iPhone 15 Pro", false},
+		{"wrong type", "Apple iPhone 15 Pro (photo)", false},
+		{"empty", "", false},
+		{"just parens", "(image)", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDeviceDir(tt.dir)
+			if tt.valid {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateDateDir(t *testing.T) {
+	tests := []struct {
+		name  string
+		dir   string
+		valid bool
+	}{
+		{"valid", "2024-08-20", true},
+		{"valid new year", "2025-01-01", true},
+		{"invalid month", "2024-13-01", false},
+		{"no dashes", "20240820", false},
+		{"too short", "2024-01", false},
+		{"not a date", "hello", false},
+		{"empty", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDateDir(tt.dir)
+			if tt.valid {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+			}
+		})
+	}
+}

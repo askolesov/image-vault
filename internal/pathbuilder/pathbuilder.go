@@ -83,6 +83,30 @@ func ValidateProcessedDirName(dirName string, expectedYear string) error {
 	return nil
 }
 
+var deviceDirRegex = regexp.MustCompile(`^.+ \((image|video|audio)\)$`)
+
+// ValidateDeviceDir checks that a directory name matches the "<Make> <Model> (<type>)" pattern.
+func ValidateDeviceDir(name string) error {
+	if !deviceDirRegex.MatchString(name) {
+		return fmt.Errorf("directory %q does not match device format '<Make> [Model] (image|video|audio)'", name)
+	}
+	return nil
+}
+
+var dateDirRegex = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+// ValidateDateDir checks that a directory name matches YYYY-MM-DD format and is a valid date.
+func ValidateDateDir(name string) error {
+	if !dateDirRegex.MatchString(name) {
+		return fmt.Errorf("directory %q does not match date format YYYY-MM-DD", name)
+	}
+	_, err := time.Parse("2006-01-02", name)
+	if err != nil {
+		return fmt.Errorf("invalid date %q: %w", name, err)
+	}
+	return nil
+}
+
 // ParsedSourceFilename holds the parsed components of a source filename.
 type ParsedSourceFilename struct {
 	DateTime time.Time

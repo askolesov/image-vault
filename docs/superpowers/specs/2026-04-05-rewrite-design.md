@@ -169,15 +169,19 @@ Per-file pipeline — no batching, keeps memory flat for 3TB+ libraries:
 Per-file pipeline, same as import:
 
 1. **Select scope:** if `--year 2025`, only scan `<library>/2025/`. Otherwise all years.
-2. **Verify sources:** for each file in `sources/`:
+2. **Validate structure** — strict, no unexpected entries at any level:
+   - **Library root:** only YYYY year directories (no files, no other dirs)
+   - **Year level:** only `sources/` and `processed/` (no files, no other dirs)
+   - **Sources level:** only valid device directories matching `<Make> [Model] (image|video|audio)` (no files, no other dirs)
+   - **Device level:** only valid date directories matching `YYYY-MM-DD` (no files, no other dirs)
+   - **Date level:** only valid source filenames and sidecars
+   - **Processed level:** only validly named directories `YYYY-MM-DD <event name>` (no files). Contents inside are freeform.
+   - OS junk files (`.DS_Store`, etc.) are ignored at all levels.
+3. **Verify source files:** for each file in `sources/`:
    - Extract metadata, compute expected path
    - Compare actual path vs expected path — mismatch is an inconsistency
    - Re-hash file, confirm hash in filename matches actual content
    - With `--fix`: move file to correct location
-3. **Verify processed:** for each directory in `processed/`:
-   - Validate naming: must match `YYYY-MM-DD <event name>` (strict single space)
-   - Validate year: directory date must match parent year
-   - Contents are freeform — no validation inside
 4. **Report:** summary — verified, inconsistent, fixed, errors
 
 ### Verify Flags
