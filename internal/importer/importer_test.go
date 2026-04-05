@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -326,4 +327,97 @@ func mustHasher(algo string) *defaults.Hasher {
 		panic(err)
 	}
 	return h
+}
+
+// errExtractor returns an error for all Extract calls.
+type errExtractor struct{}
+
+func (e *errExtractor) Extract(path string, hasher *defaults.Hasher) (*metadata.FileMetadata, error) {
+	return nil, fmt.Errorf("extraction failed")
+}
+
+func TestImportExtractError(t *testing.T) {
+	srcDir := t.TempDir()
+	libDir := t.TempDir()
+
+	createTestFile(t, filepath.Join(srcDir, "photo.jpg"), "content")
+
+	cfg := Config{
+		LibraryPath: libDir,
+		HashAlgo:    "md5",
+		FailFast:    false,
+	}
+
+	imp := New(cfg, &errExtractor{}, newTestLogger())
+	result, err := imp.ImportDir(srcDir)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Errors)
+}
+
+func TestImportExtractErrorFailFast(t *testing.T) {
+	srcDir := t.TempDir()
+	libDir := t.TempDir()
+
+	createTestFile(t, filepath.Join(srcDir, "photo.jpg"), "content")
+
+	cfg := Config{
+		LibraryPath: libDir,
+		HashAlgo:    "md5",
+		FailFast:    true,
+	}
+
+	imp := New(cfg, &errExtractor{}, newTestLogger())
+	_, err := imp.ImportDir(srcDir)
+	assert.Error(t, err)
+}
+
+func TestImportNonexistentSourceDir(t *testing.T) {
+	cfg := Config{
+		LibraryPath: t.TempDir(),
+		HashAlgo:    "md5",
+	}
+
+	imp := New(cfg, &fakeExtractor{}, newTestLogger())
+	_, err := imp.ImportDir("/nonexistent/source/dir")
+	assert.Error(t, err)
+}
+
+func TestNewImporterInvalidHashAlgo(t *testing.T) {
+	cfg := Config{
+		LibraryPath: t.TempDir(),
+		HashAlgo:    "invalid-algo",
+	}
+
+	imp := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.NotNil(t, imp)
+	require.NotNil(t, imp.hasher)
+}
+
+func TestLinkSidecarsOrphan(t *testing.T) {
+	// Orphan sidecars with different base names → each becomes a primary
+	files := []string{
+		"/path/to/alpha.xmp",
+		"/path/to/beta.aae",
+	}
+	groups := linkSidecars(files)
+	assert.Len(t, groups, 2)
+	for _, g := range groups {
+		assert.Empty(t, g.Sidecars)
+	}
+}
+
+func TestLinkSidecarsSameBase(t *testing.T) {
+	// Sidecars with same base name but no primary → each orphan sidecar becomes primary
+	files := []string{
+		"/path/to/photo.xmp",
+		"/path/to/photo.aae",
+	}
+	groups := linkSidecars(files)
+	// Both are sidecars with same base "photo", orphan group → each becomes its own primary
+	totalPaths := 0
+	for _, g := range groups {
+		totalPaths++
+		totalPaths += len(g.Sidecars)
+	}
+	assert.Equal(t, 2, totalPaths)
 }

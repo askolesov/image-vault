@@ -173,3 +173,85 @@ func TestCompareFilesDifferentSize(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, equal)
 }
+
+func TestTransferDryRunMove(t *testing.T) {
+	dir := t.TempDir()
+	src := writeFile(t, dir, "src/photo.jpg", "image-data")
+	dst := filepath.Join(dir, "dst/photo.jpg")
+
+	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true})
+	require.NoError(t, err)
+	assert.Equal(t, ActionWouldMove, action)
+
+	// Source should still exist
+	_, err = os.Stat(src)
+	assert.NoError(t, err)
+	// Destination should not exist
+	_, err = os.Stat(dst)
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestTransferDifferentContentMoveReplace(t *testing.T) {
+	dir := t.TempDir()
+	src := writeFile(t, dir, "src/photo.jpg", "new-content")
+	dst := writeFile(t, dir, "dst/photo.jpg", "old-content")
+
+	action, err := TransferFile(src, dst, Options{Move: true})
+	require.NoError(t, err)
+	assert.Equal(t, ActionReplaced, action)
+
+	// Source should be removed
+	_, err = os.Stat(src)
+	assert.True(t, os.IsNotExist(err))
+
+	// Destination has new content
+	data, err := os.ReadFile(dst)
+	require.NoError(t, err)
+	assert.Equal(t, "new-content", string(data))
+}
+
+func TestTransferIdenticalDryRunCopy(t *testing.T) {
+	dir := t.TempDir()
+	src := writeFile(t, dir, "src/photo.jpg", "same-content")
+	dst := writeFile(t, dir, "dst/photo.jpg", "same-content")
+
+	// Identical files with DryRun (no Move) → skipped (not would_copy)
+	action, err := TransferFile(src, dst, Options{DryRun: true})
+	require.NoError(t, err)
+	assert.Equal(t, ActionSkipped, action)
+}
+
+func TestTransferIdenticalDryRunMove(t *testing.T) {
+	dir := t.TempDir()
+	src := writeFile(t, dir, "src/photo.jpg", "same-content")
+	dst := writeFile(t, dir, "dst/photo.jpg", "same-content")
+
+	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true})
+	require.NoError(t, err)
+	assert.Equal(t, ActionWouldMove, action)
+
+	// Source should still exist (dry run)
+	_, err = os.Stat(src)
+	assert.NoError(t, err)
+}
+
+func TestCompareFilesNonexistent(t *testing.T) {
+	dir := t.TempDir()
+	a := writeFile(t, dir, "a.txt", "data")
+
+	_, err := CompareFiles(a, filepath.Join(dir, "nonexistent.txt"))
+	assert.Error(t, err)
+
+	_, err = CompareFiles(filepath.Join(dir, "nonexistent.txt"), a)
+	assert.Error(t, err)
+}
+
+func TestCompareFilesSameSizeDifferentContent(t *testing.T) {
+	dir := t.TempDir()
+	a := writeFile(t, dir, "a.txt", "aaaa")
+	b := writeFile(t, dir, "b.txt", "bbbb")
+
+	equal, err := CompareFiles(a, b)
+	require.NoError(t, err)
+	assert.False(t, equal)
+}

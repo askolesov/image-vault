@@ -185,6 +185,42 @@ func TestFileMetadataMediaCreateDateFallback(t *testing.T) {
 	assert.Equal(t, 10, meta.DateTime.Day())
 }
 
+func TestGetFileModTimeError(t *testing.T) {
+	_, err := GetFileModTime("/nonexistent/file.txt")
+	assert.Error(t, err)
+}
+
+func TestBuildFileMetadataDeviceManufacturerFallback(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "photo.jpg")
+	err := os.WriteFile(tmpFile, []byte("fake image data"), 0644)
+	require.NoError(t, err)
+
+	hasher, err := defaults.NewHasher("md5")
+	require.NoError(t, err)
+
+	// Use DeviceManufacturer instead of Make, DeviceModelName instead of Model
+	fields := map[string]interface{}{
+		"DateTimeOriginal":   "2024:03:10 08:30:00",
+		"DeviceManufacturer": "Samsung",
+		"DeviceModelName":    "Galaxy S24",
+		"MIMEType":           "image/jpeg",
+	}
+
+	meta, err := BuildFileMetadata(tmpFile, fields, hasher)
+	require.NoError(t, err)
+
+	assert.Equal(t, "Samsung", meta.Make)
+	assert.Equal(t, "Galaxy S24", meta.Model)
+}
+
+func TestBuildFileMetadataHashError(t *testing.T) {
+	hasher, err := defaults.NewHasher("md5")
+	require.NoError(t, err)
+
+	_, err = BuildFileMetadata("/nonexistent/file.jpg", map[string]interface{}{}, hasher)
+	assert.Error(t, err)
+}
+
 func TestGetStringFieldEdgeCases(t *testing.T) {
 	fields := map[string]interface{}{
 		"string_key": "hello",

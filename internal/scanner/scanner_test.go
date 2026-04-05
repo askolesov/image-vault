@@ -116,3 +116,60 @@ func TestShouldIncludeFile(t *testing.T) {
 	// Directories should always be included when include patterns are set.
 	assert.True(t, s.shouldIncludeFile("subdir", true))
 }
+
+func TestShouldIncludeFile_NoPatterns(t *testing.T) {
+	s := NewScanner(nil, nil)
+
+	assert.True(t, s.shouldIncludeFile("anything.txt", false))
+	assert.True(t, s.shouldIncludeFile("photo.jpg", false))
+	assert.True(t, s.shouldIncludeFile("dir", true))
+}
+
+func TestShouldIncludeFile_ExcludeDir(t *testing.T) {
+	s := NewScanner(nil, []string{"node_modules"})
+
+	assert.False(t, s.shouldIncludeFile("node_modules", true))
+	assert.True(t, s.shouldIncludeFile("src", true))
+}
+
+func TestMatchPattern_PathSeparator(t *testing.T) {
+	// Pattern with / should match against full relative path
+	assert.True(t, matchPattern("subdir/*.jpg", "photo.jpg", "subdir/photo.jpg"))
+	assert.False(t, matchPattern("subdir/*.jpg", "photo.jpg", "other/photo.jpg"))
+}
+
+func TestMatchPattern_BaseName(t *testing.T) {
+	// Pattern without / should match against base name
+	assert.True(t, matchPattern("*.jpg", "photo.jpg", "some/path/photo.jpg"))
+	assert.False(t, matchPattern("*.png", "photo.jpg", "some/path/photo.jpg"))
+}
+
+func TestScanDirectory_ExcludeSubdir(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "include"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "include", "a.txt"), []byte("data"), 0o644))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "exclude"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "exclude", "b.txt"), []byte("data"), 0o644))
+
+	s := NewScanner(nil, []string{"exclude"})
+	result, err := s.ScanDirectory(dir, nil)
+	require.NoError(t, err)
+
+	// Should only contain include dir and a.txt
+	for _, f := range result.Files {
+		assert.NotContains(t, f.Path, "exclude")
+	}
+}
+
+func TestLoadFromFile_NotFound(t *testing.T) {
+	_, err := LoadFromFile("/nonexistent/scan.json")
+	assert.Error(t, err)
+}
+
+func TestLoadFromFile_InvalidJSON(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "bad.json")
+	require.NoError(t, os.WriteFile(f, []byte("not json"), 0o644))
+
+	_, err := LoadFromFile(f)
+	assert.Error(t, err)
+}

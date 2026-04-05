@@ -108,3 +108,111 @@ func TestNewLoggerTTYMode(t *testing.T) {
 	l2 := New(&stdout, &stderr, false)
 	assert.False(t, l2.isTTY)
 }
+
+func TestLoggerTTYWarn(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	l := New(&stdout, &stderr, true)
+
+	l.Warn("tty warning %d", 42)
+
+	out := stderr.String()
+	assert.Contains(t, out, "\r\033[K[warn] tty warning 42\n")
+	assert.Empty(t, stdout.String())
+	assert.Equal(t, 1, l.WarnCount())
+}
+
+func TestLoggerTTYError(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	l := New(&stdout, &stderr, true)
+
+	l.Error("tty error %s", "oops")
+
+	out := stderr.String()
+	assert.Contains(t, out, "\r\033[K[error] tty error oops\n")
+	assert.Equal(t, 1, l.ErrorCount())
+}
+
+func TestLoggerTTYProgress(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	l := New(&stdout, &stderr, true)
+
+	l.Progress(50, 100, "/very/long/path/to/some/deeply/nested/file.jpg")
+
+	out := stderr.String()
+	assert.Contains(t, out, "\r\033[K")
+	assert.Contains(t, out, "[50%]")
+	assert.Contains(t, out, "50/100")
+}
+
+func TestLoggerClearProgressTTY(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	l := New(&stdout, &stderr, true)
+
+	l.ClearProgress()
+
+	out := stderr.String()
+	assert.Equal(t, "\r\033[K", out)
+}
+
+func TestLoggerClearProgressNonTTY(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	l := New(&stdout, &stderr, false)
+
+	l.ClearProgress()
+
+	// Non-TTY mode should not write anything
+	assert.Empty(t, stderr.String())
+}
+
+func TestTruncate(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxLen   int
+		expected string
+	}{
+		{"short string", "hello", 10, "hello"},
+		{"exact length", "hello", 5, "hello"},
+		{"truncated", "/very/long/path/to/file.jpg", 16, "...h/to/file.jpg"},
+		{"maxLen 3", "abcdef", 3, "..."},
+		{"maxLen 2", "abcdef", 2, ".."},
+		{"maxLen 1", "abcdef", 1, "."},
+		{"maxLen 0", "abcdef", 0, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := truncate(tt.input, tt.maxLen)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestLoggerProgressZeroTotal(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	l := New(&stdout, &stderr, false)
+
+	l.Progress(0, 0, "file.jpg")
+
+	out := stderr.String()
+	assert.Contains(t, out, "(0%)")
+}
+
+func TestLoggerSummaryWithFixedAndVerified(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	l := New(&stdout, &stderr, false)
+
+	l.PrintSummary(Summary{
+		TotalFiles: 100,
+		Fixed:      5,
+		Verified:   95,
+	})
+
+	out := stdout.String()
+	assert.Contains(t, out, "Total files: 100")
+	assert.Contains(t, out, "Fixed: 5")
+	assert.Contains(t, out, "Verified: 95")
+	// Zero fields should not appear
+	assert.NotContains(t, out, "Imported")
+	assert.NotContains(t, out, "Skipped")
+}
