@@ -184,6 +184,7 @@ Per-file pipeline, same as import:
 
 - `--year 2025` — scope to one year
 - `--fix` — repair inconsistencies (move files to correct paths)
+- `--fast` — fast mode: validate filenames and directory structure only, skip hash recomputation and content verification. Useful for quick structural checks on large libraries.
 - `--no-fail-fast` — collect all errors
 
 ## Logging & Progress

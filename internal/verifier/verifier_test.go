@@ -621,3 +621,79 @@ func TestNewVerifierInvalidHashAlgo(t *testing.T) {
 	require.NotNil(t, v)
 	require.NotNil(t, v.hasher)
 }
+
+func TestVerifyFastMode(t *testing.T) {
+	libDir := t.TempDir()
+
+	// Create a correctly named source file
+	content := "image data for fast test"
+	hasher, _ := defaults.NewHasher("md5")
+	_, shortHash, err := metadata.ComputeFileHash(
+		func() string {
+		p := filepath.Join(libDir, "tmp.dat")
+		createTestFile(t, p, content)
+		return p
+	}(), hasher)
+	require.NoError(t, err)
+	os.Remove(filepath.Join(libDir, "tmp.dat"))
+
+	filename := fmt.Sprintf("2024-01-15_12-00-00_%s.jpg", shortHash)
+	path := filepath.Join("2024", "sources", "TestMake TestModel (image)", "2024-01-15", filename)
+	createTestFile(t, filepath.Join(libDir, path), content)
+
+	v := New(Config{
+		LibraryPath:   libDir,
+		SeparateVideo: true,
+		HashAlgo:      "md5",
+		FailFast:      true,
+		Fast:          true,
+	}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Verified)
+	assert.Equal(t, 0, result.Inconsistent)
+}
+
+func TestVerifyFastModeInvalidFilename(t *testing.T) {
+	libDir := t.TempDir()
+
+	// Create a file with invalid name format
+	path := filepath.Join("2024", "sources", "TestMake TestModel (image)", "2024-01-15", "bad-name.jpg")
+	createTestFile(t, filepath.Join(libDir, path), "data")
+
+	v := New(Config{
+		LibraryPath:   libDir,
+		SeparateVideo: true,
+		HashAlgo:      "md5",
+		FailFast:      false,
+		Fast:          true,
+	}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.Verified)
+	assert.Equal(t, 1, result.Inconsistent)
+}
+
+func TestVerifyFastModeSkipsHashCheck(t *testing.T) {
+	libDir := t.TempDir()
+
+	// Create a file with valid name but WRONG hash — fast mode should still pass it
+	filename := "2024-01-15_12-00-00_deadbeef.jpg"
+	path := filepath.Join("2024", "sources", "TestMake TestModel (image)", "2024-01-15", filename)
+	createTestFile(t, filepath.Join(libDir, path), "content that does not match deadbeef hash")
+
+	v := New(Config{
+		LibraryPath:   libDir,
+		SeparateVideo: true,
+		HashAlgo:      "md5",
+		FailFast:      true,
+		Fast:          true,
+	}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Verified)
+	assert.Equal(t, 0, result.Inconsistent)
+}

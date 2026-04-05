@@ -14,6 +14,7 @@ import (
 func newVerifyCmd() *cobra.Command {
 	var (
 		fix        bool
+		fast       bool
 		year       string
 		noFailFast bool
 		hashAlgo   string
@@ -43,6 +44,7 @@ func newVerifyCmd() *cobra.Command {
 				HashAlgo:      hashAlgo,
 				FailFast:      !noFailFast,
 				Fix:           fix,
+				Fast:          fast,
 				YearFilter:    year,
 			}
 
@@ -69,6 +71,7 @@ func newVerifyCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&fix, "fix", false, "Automatically fix inconsistencies")
 	cmd.Flags().StringVar(&year, "year", "", "Only verify files from this year")
 	cmd.Flags().BoolVar(&noFailFast, "no-fail-fast", false, "Continue on errors instead of stopping")
+	cmd.Flags().BoolVar(&fast, "fast", false, "Fast mode: validate filenames and structure only, skip hash verification")
 	cmd.Flags().StringVar(&hashAlgo, "hash-algo", defaults.DefaultHashAlgorithm, "Hash algorithm to use (md5, sha256)")
 
 	return cmd

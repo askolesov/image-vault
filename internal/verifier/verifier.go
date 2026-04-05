@@ -24,6 +24,7 @@ type Config struct {
 	HashAlgo      string
 	FailFast      bool
 	Fix           bool
+	Fast          bool
 	YearFilter    string
 }
 
@@ -106,7 +107,22 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, result *Result) error
 			continue
 		}
 
-		// Extract metadata
+		// Fast mode: validate filename format only, no hash verification
+		if v.cfg.Fast {
+			_, err := pathbuilder.ParseSourceFilename(baseName)
+			if err != nil {
+				result.Inconsistent++
+				v.logger.Warn("invalid source filename: %s (%v)", filePath, err)
+				if v.cfg.FailFast {
+					return fmt.Errorf("invalid source filename %q: %w", baseName, err)
+				}
+			} else {
+				result.Verified++
+			}
+			continue
+		}
+
+		// Full mode: extract metadata, verify path and hash
 		md, err := v.ext.Extract(filePath, v.hasher)
 		if err != nil {
 			result.Errors++
