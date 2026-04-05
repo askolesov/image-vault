@@ -147,8 +147,7 @@ func compareFiles(a, b string, newHash func() hash.Hash, sourceHash string) (boo
 	}
 
 	if newHash == nil {
-		// No hasher provided — size match is the best we can do
-		return true, nil
+		return false, errors.New("hasher is required for file comparison")
 	}
 
 	hashA := sourceHash

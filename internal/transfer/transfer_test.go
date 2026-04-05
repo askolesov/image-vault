@@ -183,7 +183,7 @@ func TestTransferDryRunMove(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "image-data")
 	dst := filepath.Join(dir, "dst/photo.jpg")
 
-	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true})
+	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true, NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionWouldMove, action)
 
@@ -230,7 +230,7 @@ func TestTransferIdenticalDryRunMove(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "same-content")
 	dst := writeFile(t, dir, "dst/photo.jpg", "same-content")
 
-	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true})
+	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true, NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionWouldMove, action)
 
