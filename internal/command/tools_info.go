@@ -20,7 +20,7 @@ func newToolsInfoCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("create exif extractor: %w", err)
 			}
-			defer ext.Close()
+			defer func() { _ = ext.Close() }()
 
 			hasher, err := defaults.NewHasher(defaults.DefaultHashAlgorithm)
 			if err != nil {

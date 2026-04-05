@@ -36,7 +36,7 @@ func newVerifyCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("create exif extractor: %w", err)
 			}
-			defer ext.Close()
+			defer func() { _ = ext.Close() }()
 
 			cfg := verifier.Config{
 				LibraryPath:   libraryPath,

@@ -33,7 +33,7 @@ func ComputeFileHash(path string, hasher *defaults.Hasher) (full string, short s
 	if err != nil {
 		return "", "", fmt.Errorf("open file: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	h := hasher.New()
 	if _, err := io.Copy(h, f); err != nil {

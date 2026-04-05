@@ -220,7 +220,7 @@ func TestListSourceFilesPermissionError(t *testing.T) {
 	// Make the restricted dir unreadable
 	require.NoError(t, os.Chmod(filepath.Join(sourcesDir, "restricted"), 0o000))
 	t.Cleanup(func() {
-		os.Chmod(filepath.Join(sourcesDir, "restricted"), 0o755)
+		_ = os.Chmod(filepath.Join(sourcesDir, "restricted"), 0o755)
 	})
 
 	// Should skip permission errors gracefully
@@ -261,7 +261,7 @@ func TestListProcessedDirsError(t *testing.T) {
 	processedDir := filepath.Join(dir, "processed")
 	require.NoError(t, os.MkdirAll(processedDir, 0o000))
 	t.Cleanup(func() {
-		os.Chmod(processedDir, 0o755)
+		_ = os.Chmod(processedDir, 0o755)
 	})
 
 	_, err := ListProcessedDirs(dir)
@@ -279,7 +279,7 @@ func TestRemoveEmptyDirsPermissionError(t *testing.T) {
 	// Make restricted unreadable (isDirEffectivelyEmpty will fail on it)
 	require.NoError(t, os.Chmod(filepath.Join(dir, "restricted"), 0o000))
 	t.Cleanup(func() {
-		os.Chmod(filepath.Join(dir, "restricted"), 0o755)
+		_ = os.Chmod(filepath.Join(dir, "restricted"), 0o755)
 	})
 
 	// RemoveEmptyDirs will encounter a permission error when checking restricted/
@@ -301,7 +301,7 @@ func TestListSourceFilesStatError(t *testing.T) {
 	// Make parent dir unreadable to prevent stat on sources
 	require.NoError(t, os.Chmod(dir, 0o000))
 	t.Cleanup(func() {
-		os.Chmod(dir, 0o755)
+		_ = os.Chmod(dir, 0o755)
 	})
 
 	_, err := ListSourceFiles(dir)

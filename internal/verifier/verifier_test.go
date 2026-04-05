@@ -635,7 +635,7 @@ func TestVerifyFastMode(t *testing.T) {
 		return p
 	}(), hasher)
 	require.NoError(t, err)
-	os.Remove(filepath.Join(libDir, "tmp.dat"))
+	_ = os.Remove(filepath.Join(libDir, "tmp.dat"))
 
 	filename := fmt.Sprintf("2024-01-15_12-00-00_%s.jpg", shortHash)
 	path := filepath.Join("2024", "sources", "TestMake TestModel (image)", "2024-01-15", filename)
@@ -807,7 +807,7 @@ func TestVerifyCleanLibraryNoInconsistencies(t *testing.T) {
 	createTestFile(t, tmpPath, content)
 	_, shortHash, err := metadata.ComputeFileHash(tmpPath, hasher)
 	require.NoError(t, err)
-	os.Remove(tmpPath)
+	_ = os.Remove(tmpPath)
 
 	filename := fmt.Sprintf("2024-01-15_12-00-00_%s.jpg", shortHash)
 	createTestFile(t, filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", filename), content)

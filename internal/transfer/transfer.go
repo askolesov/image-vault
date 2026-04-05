@@ -158,7 +158,7 @@ func fileHash(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("open %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
@@ -178,13 +178,13 @@ func copyFile(source, target string) error {
 	if err != nil {
 		return fmt.Errorf("open source: %w", err)
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	dst, err := os.Create(target)
 	if err != nil {
 		return fmt.Errorf("create target: %w", err)
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	if _, err := io.Copy(dst, src); err != nil {
 		return fmt.Errorf("copy data: %w", err)

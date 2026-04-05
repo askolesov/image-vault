@@ -46,9 +46,9 @@ func (l *Logger) Warn(format string, args ...interface{}) {
 	defer l.mu.Unlock()
 	l.warnCount++
 	if l.isTTY {
-		fmt.Fprintf(l.stderr, "\r\033[K[warn] %s\n", msg)
+		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[warn] %s\n", msg)
 	} else {
-		fmt.Fprintf(l.stderr, "[warn] %s\n", msg)
+		_, _ = fmt.Fprintf(l.stderr, "[warn] %s\n", msg)
 	}
 }
 
@@ -59,9 +59,9 @@ func (l *Logger) Error(format string, args ...interface{}) {
 	defer l.mu.Unlock()
 	l.errorCount++
 	if l.isTTY {
-		fmt.Fprintf(l.stderr, "\r\033[K[error] %s\n", msg)
+		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[error] %s\n", msg)
 	} else {
-		fmt.Fprintf(l.stderr, "[error] %s\n", msg)
+		_, _ = fmt.Fprintf(l.stderr, "[error] %s\n", msg)
 	}
 }
 
@@ -75,9 +75,9 @@ func (l *Logger) Progress(current, total int, currentFile string) {
 	defer l.mu.Unlock()
 	if l.isTTY {
 		file := truncate(currentFile, 40)
-		fmt.Fprintf(l.stderr, "\r\033[K[%d%%] %s/%s %s", pct, formatNumber(current), formatNumber(total), file)
+		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[%d%%] %s/%s %s", pct, formatNumber(current), formatNumber(total), file)
 	} else {
-		fmt.Fprintf(l.stderr, "[progress] %s/%s (%d%%)\n", formatNumber(current), formatNumber(total), pct)
+		_, _ = fmt.Fprintf(l.stderr, "[progress] %s/%s (%d%%)\n", formatNumber(current), formatNumber(total), pct)
 	}
 }
 
@@ -86,7 +86,7 @@ func (l *Logger) ClearProgress() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.isTTY {
-		fmt.Fprint(l.stderr, "\r\033[K")
+		_, _ = fmt.Fprint(l.stderr, "\r\033[K")
 	}
 }
 
@@ -114,7 +114,7 @@ func (l *Logger) PrintSummary(s Summary) {
 	defer l.mu.Unlock()
 	for _, f := range fields {
 		if f.value != 0 {
-			fmt.Fprintf(l.stdout, "%s: %s\n", f.label, formatNumber(f.value))
+			_, _ = fmt.Fprintf(l.stdout, "%s: %s\n", f.label, formatNumber(f.value))
 		}
 	}
 }

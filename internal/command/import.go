@@ -44,7 +44,7 @@ func newImportCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("create exif extractor: %w", err)
 			}
-			defer ext.Close()
+			defer func() { _ = ext.Close() }()
 
 			cfg := importer.Config{
 				LibraryPath:   libraryPath,
