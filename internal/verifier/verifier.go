@@ -115,9 +115,15 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, result *Result) error
 	}
 
 	total := len(files)
+	var processedBytes int64
 	for i, filePath := range files {
-		stats := fmt.Sprintf("valid:%d fixed:%d inconsistent:%d", result.Verified, result.Fixed, result.Inconsistent)
+		stats := fmt.Sprintf("valid:%d fixed:%d inconsistent:%d %s",
+			result.Verified, result.Fixed, result.Inconsistent, logging.FormatBytes(processedBytes))
 		v.logger.ProgressWithStats(i+1, total, stats, filePath)
+
+		if info, err := os.Stat(filePath); err == nil {
+			processedBytes += info.Size()
+		}
 
 		baseName := filepath.Base(filePath)
 
