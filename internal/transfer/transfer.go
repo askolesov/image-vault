@@ -1,9 +1,10 @@
 package transfer
 
 import (
-	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"os"
 	"path/filepath"
@@ -25,8 +26,14 @@ const (
 
 // Options configures the transfer behaviour.
 type Options struct {
-	Move   bool
+	Move bool
 	DryRun bool
+	// NewHash returns a new hash.Hash instance for file comparison.
+	// When nil, files are compared byte-by-byte via size check only.
+	NewHash func() hash.Hash
+	// SourceHash is a pre-computed full hex hash of the source file (using NewHash).
+	// When set, the source file is not re-read for comparison.
+	SourceHash string
 }
 
 // TransferFile copies or moves source to target with paranoid hash verification.
@@ -60,7 +67,7 @@ func TransferFile(source, target string, opts Options) (Action, error) {
 	targetExists := statErr == nil
 
 	if targetExists {
-		identical, err := CompareFiles(source, target)
+		identical, err := compareFiles(source, target, opts.NewHash, opts.SourceHash)
 		if err != nil {
 			return "", fmt.Errorf("compare files: %w", err)
 		}
@@ -122,9 +129,9 @@ func TransferFile(source, target string, opts Options) (Action, error) {
 	return ActionCopied, nil
 }
 
-// CompareFiles returns true if both files have identical content.
-// It checks sizes first for an early exit, then compares SHA-256 hashes.
-func CompareFiles(a, b string) (bool, error) {
+// compareFiles compares two files. If sourceHash is non-empty, it is used
+// as the pre-computed hash of file a, skipping a re-read.
+func compareFiles(a, b string, newHash func() hash.Hash, sourceHash string) (bool, error) {
 	infoA, err := os.Stat(a)
 	if err != nil {
 		return false, fmt.Errorf("stat %s: %w", a, err)
@@ -139,12 +146,19 @@ func CompareFiles(a, b string) (bool, error) {
 		return false, nil
 	}
 
-	hashA, err := fileHash(a)
-	if err != nil {
-		return false, err
+	if newHash == nil {
+		return false, errors.New("hasher is required for file comparison")
 	}
 
-	hashB, err := fileHash(b)
+	hashA := sourceHash
+	if hashA == "" {
+		hashA, err = fileHash(a, newHash)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	hashB, err := fileHash(b, newHash)
 	if err != nil {
 		return false, err
 	}
@@ -152,20 +166,20 @@ func CompareFiles(a, b string) (bool, error) {
 	return hashA == hashB, nil
 }
 
-// fileHash returns the hex-encoded SHA-256 hash of the file at path.
-func fileHash(path string) (string, error) {
+// fileHash returns the hex-encoded hash of the file at path using the provided hash function.
+func fileHash(path string, newHash func() hash.Hash) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", fmt.Errorf("open %s: %w", path, err)
 	}
 	defer func() { _ = f.Close() }()
 
-	h := sha256.New()
+	h := newHash()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", fmt.Errorf("hash %s: %w", path, err)
 	}
 
-	return fmt.Sprintf("%x", h.Sum(nil)), nil
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // copyFile copies source to target, creating parent directories as needed.

@@ -1,6 +1,8 @@
 package transfer
 
 import (
+	"crypto/sha256"
+	"hash"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,6 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func testHasher() func() hash.Hash { return sha256.New }
 
 func writeFile(t *testing.T, dir, name, content string) string {
 	t.Helper()
@@ -22,7 +26,7 @@ func TestTransferNewFile(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "image-data")
 	dst := filepath.Join(dir, "dst/photo.jpg")
 
-	action, err := TransferFile(src, dst, Options{})
+	action, err := TransferFile(src, dst, Options{NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionCopied, action)
 
@@ -41,7 +45,7 @@ func TestTransferMoveFile(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "image-data")
 	dst := filepath.Join(dir, "dst/photo.jpg")
 
-	action, err := TransferFile(src, dst, Options{Move: true})
+	action, err := TransferFile(src, dst, Options{Move: true, NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionMoved, action)
 
@@ -60,7 +64,7 @@ func TestTransferIdenticalExists(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "same-content")
 	dst := writeFile(t, dir, "dst/photo.jpg", "same-content")
 
-	action, err := TransferFile(src, dst, Options{})
+	action, err := TransferFile(src, dst, Options{NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionSkipped, action)
 }
@@ -70,7 +74,7 @@ func TestTransferIdenticalExistsMove(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "same-content")
 	dst := writeFile(t, dir, "dst/photo.jpg", "same-content")
 
-	action, err := TransferFile(src, dst, Options{Move: true})
+	action, err := TransferFile(src, dst, Options{Move: true, NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionMoved, action)
 
@@ -84,7 +88,7 @@ func TestTransferDifferentContentReplace(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "new-content")
 	dst := writeFile(t, dir, "dst/photo.jpg", "old-content")
 
-	action, err := TransferFile(src, dst, Options{})
+	action, err := TransferFile(src, dst, Options{NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionReplaced, action)
 
@@ -112,7 +116,7 @@ func TestTransferDryRun(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "image-data")
 	dst := filepath.Join(dir, "dst/photo.jpg")
 
-	action, err := TransferFile(src, dst, Options{DryRun: true})
+	action, err := TransferFile(src, dst, Options{DryRun: true, NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionWouldCopy, action)
 
@@ -126,7 +130,7 @@ func TestTransferDryRunReplace(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "new-content")
 	dst := writeFile(t, dir, "dst/photo.jpg", "old-content")
 
-	action, err := TransferFile(src, dst, Options{DryRun: true})
+	action, err := TransferFile(src, dst, Options{DryRun: true, NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionWouldReplace, action)
 
@@ -154,12 +158,12 @@ func TestTransferSourceIsDirectory(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestCompareFiles(t *testing.T) {
+func TestCompareFilesIdentical(t *testing.T) {
 	dir := t.TempDir()
 	a := writeFile(t, dir, "a.txt", "identical")
 	b := writeFile(t, dir, "b.txt", "identical")
 
-	equal, err := CompareFiles(a, b)
+	equal, err := compareFiles(a, b, testHasher(), "")
 	require.NoError(t, err)
 	assert.True(t, equal)
 }
@@ -169,7 +173,7 @@ func TestCompareFilesDifferentSize(t *testing.T) {
 	a := writeFile(t, dir, "a.txt", "short")
 	b := writeFile(t, dir, "b.txt", "much longer content")
 
-	equal, err := CompareFiles(a, b)
+	equal, err := compareFiles(a, b, testHasher(), "")
 	require.NoError(t, err)
 	assert.False(t, equal)
 }
@@ -179,7 +183,7 @@ func TestTransferDryRunMove(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "image-data")
 	dst := filepath.Join(dir, "dst/photo.jpg")
 
-	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true})
+	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true, NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionWouldMove, action)
 
@@ -196,7 +200,7 @@ func TestTransferDifferentContentMoveReplace(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "new-content")
 	dst := writeFile(t, dir, "dst/photo.jpg", "old-content")
 
-	action, err := TransferFile(src, dst, Options{Move: true})
+	action, err := TransferFile(src, dst, Options{Move: true, NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionReplaced, action)
 
@@ -216,7 +220,7 @@ func TestTransferIdenticalDryRunCopy(t *testing.T) {
 	dst := writeFile(t, dir, "dst/photo.jpg", "same-content")
 
 	// Identical files with DryRun (no Move) → skipped (not would_copy)
-	action, err := TransferFile(src, dst, Options{DryRun: true})
+	action, err := TransferFile(src, dst, Options{DryRun: true, NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionSkipped, action)
 }
@@ -226,7 +230,7 @@ func TestTransferIdenticalDryRunMove(t *testing.T) {
 	src := writeFile(t, dir, "src/photo.jpg", "same-content")
 	dst := writeFile(t, dir, "dst/photo.jpg", "same-content")
 
-	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true})
+	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true, NewHash: testHasher()})
 	require.NoError(t, err)
 	assert.Equal(t, ActionWouldMove, action)
 
@@ -239,10 +243,10 @@ func TestCompareFilesNonexistent(t *testing.T) {
 	dir := t.TempDir()
 	a := writeFile(t, dir, "a.txt", "data")
 
-	_, err := CompareFiles(a, filepath.Join(dir, "nonexistent.txt"))
+	_, err := compareFiles(a, filepath.Join(dir, "nonexistent.txt"), testHasher(), "")
 	assert.Error(t, err)
 
-	_, err = CompareFiles(filepath.Join(dir, "nonexistent.txt"), a)
+	_, err = compareFiles(filepath.Join(dir, "nonexistent.txt"), a, testHasher(), "")
 	assert.Error(t, err)
 }
 
@@ -251,7 +255,7 @@ func TestCompareFilesSameSizeDifferentContent(t *testing.T) {
 	a := writeFile(t, dir, "a.txt", "aaaa")
 	b := writeFile(t, dir, "b.txt", "bbbb")
 
-	equal, err := CompareFiles(a, b)
+	equal, err := compareFiles(a, b, testHasher(), "")
 	require.NoError(t, err)
 	assert.False(t, equal)
 }
