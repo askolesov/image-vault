@@ -81,7 +81,8 @@ func (imp *Importer) ImportDir(sourceDir string) (*Result, error) {
 	total := len(groups)
 
 	for i, g := range groups {
-		imp.logger.Progress(i+1, total, g.Path)
+		stats := fmt.Sprintf("new:%d skipped:%d dropped:%d", result.Imported, result.Skipped, result.Dropped)
+		imp.logger.ProgressWithStats(i+1, total, stats, g.Path)
 
 		if err := imp.importFile(g, result); err != nil {
 			result.Errors++
