@@ -158,12 +158,12 @@ func TestTransferSourceIsDirectory(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestCompareFiles(t *testing.T) {
+func TestCompareFilesIdentical(t *testing.T) {
 	dir := t.TempDir()
 	a := writeFile(t, dir, "a.txt", "identical")
 	b := writeFile(t, dir, "b.txt", "identical")
 
-	equal, err := CompareFiles(a, b, testHasher())
+	equal, err := compareFiles(a, b, testHasher(), "")
 	require.NoError(t, err)
 	assert.True(t, equal)
 }
@@ -173,7 +173,7 @@ func TestCompareFilesDifferentSize(t *testing.T) {
 	a := writeFile(t, dir, "a.txt", "short")
 	b := writeFile(t, dir, "b.txt", "much longer content")
 
-	equal, err := CompareFiles(a, b, testHasher())
+	equal, err := compareFiles(a, b, testHasher(), "")
 	require.NoError(t, err)
 	assert.False(t, equal)
 }
@@ -243,10 +243,10 @@ func TestCompareFilesNonexistent(t *testing.T) {
 	dir := t.TempDir()
 	a := writeFile(t, dir, "a.txt", "data")
 
-	_, err := CompareFiles(a, filepath.Join(dir, "nonexistent.txt"), testHasher())
+	_, err := compareFiles(a, filepath.Join(dir, "nonexistent.txt"), testHasher(), "")
 	assert.Error(t, err)
 
-	_, err = CompareFiles(filepath.Join(dir, "nonexistent.txt"), a, testHasher())
+	_, err = compareFiles(filepath.Join(dir, "nonexistent.txt"), a, testHasher(), "")
 	assert.Error(t, err)
 }
 
@@ -255,7 +255,7 @@ func TestCompareFilesSameSizeDifferentContent(t *testing.T) {
 	a := writeFile(t, dir, "a.txt", "aaaa")
 	b := writeFile(t, dir, "b.txt", "bbbb")
 
-	equal, err := CompareFiles(a, b, testHasher())
+	equal, err := compareFiles(a, b, testHasher(), "")
 	require.NoError(t, err)
 	assert.False(t, equal)
 }

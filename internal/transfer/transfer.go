@@ -129,13 +129,6 @@ func TransferFile(source, target string, opts Options) (Action, error) {
 	return ActionCopied, nil
 }
 
-// CompareFiles returns true if both files have identical content.
-// It checks sizes first for an early exit, then compares hashes using newHash.
-// If newHash is nil, only size comparison is performed.
-func CompareFiles(a, b string, newHash func() hash.Hash) (bool, error) {
-	return compareFiles(a, b, newHash, "")
-}
-
 // compareFiles compares two files. If sourceHash is non-empty, it is used
 // as the pre-computed hash of file a, skipping a re-read.
 func compareFiles(a, b string, newHash func() hash.Hash, sourceHash string) (bool, error) {
