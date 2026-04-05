@@ -168,33 +168,11 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, result *Result) error
 		}
 
 		if absActual == absExpected {
-			// Path matches — verify hash in filename against content hash (already computed by Extract)
-			parsed, err := pathbuilder.ParseSourceFilename(baseName)
-			if err != nil {
-				result.Errors++
-				v.logger.Error("parse filename %s: %v", baseName, err)
-				continue
-			}
-
-			if parsed.Hash != md.ShortHash {
-				result.Inconsistent++
-				v.logger.Warn("hash mismatch for %s: filename has %s, content has %s", filePath, parsed.Hash, md.ShortHash)
-				if v.cfg.Fix {
-					// Re-build correct filename and move
-					correctRel := pathbuilder.BuildSourcePath(md, pbOpts)
-					correctPath := filepath.Join(v.cfg.LibraryPath, correctRel)
-					if _, err := transfer.TransferFile(filePath, correctPath, transfer.Options{Move: true}); err != nil {
-						result.Errors++
-						v.logger.Error("fix move %s → %s: %v", filePath, correctPath, err)
-					} else {
-						result.Fixed++
-					}
-				}
-			} else {
-				result.Verified++
-			}
+			// Path matches — hash is correct by definition since the expected
+			// path is built from the content hash
+			result.Verified++
 		} else {
-			// Path mismatch
+			// Path mismatch (wrong dir, wrong hash in filename, etc.)
 			result.Inconsistent++
 			v.logger.Warn("path mismatch: %s should be at %s", absActual, absExpected)
 			if v.cfg.Fix {
