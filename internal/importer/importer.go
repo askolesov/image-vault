@@ -121,10 +121,12 @@ func (imp *Importer) importFile(g fileWithSidecars, result *Result) error {
 	relPath := pathbuilder.BuildSourcePath(md, pbOpts)
 	destPath := filepath.Join(imp.cfg.LibraryPath, relPath)
 
-	// Transfer
+	// Transfer — pass hasher and pre-computed source hash to avoid re-reading the file
 	tOpts := transfer.Options{
-		Move:   imp.cfg.Move,
-		DryRun: imp.cfg.DryRun,
+		Move:       imp.cfg.Move,
+		DryRun:     imp.cfg.DryRun,
+		NewHash:    imp.hasher.New,
+		SourceHash: md.FullHash,
 	}
 
 	action, err := transfer.TransferFile(g.Path, destPath, tOpts)
