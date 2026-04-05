@@ -145,16 +145,19 @@ internal/
 Per-file pipeline — no batching, keeps memory flat for 3TB+ libraries:
 
 1. **Enumerate** source directory recursively, skip OS junk files (from `defaults`)
-2. **Extract metadata** for each file: EXIF (make, model, datetime, mime type), filesystem info, hash
-3. **Classify** media type from MIME: image, video, audio, or other. Drop "other" unless `--keep-all`
-4. **Normalize** make/model through normalization maps in `defaults`
-5. **Build destination path** deterministically: `<library>/<year>/sources/<Make Model (type)>/<date>/<datetime_hash.ext>`
-6. **Check destination:**
+2. **Randomize** file order (default on, `--no-randomize` to disable) — spreads I/O across destination directories
+3. **Extract metadata** for each file: EXIF (make, model, datetime, mime type), filesystem info, hash
+4. **Classify** media type from MIME: image, video, audio, or other. Drop "other" unless `--keep-all`
+5. **Normalize** make/model through normalization maps in `defaults`
+6. **Build destination path** deterministically: `<library>/<year>/sources/<Make Model (type)>/<date>/<datetime_hash.ext>`
+7. **Check destination:**
    - Doesn't exist: copy/move the file
-   - Exists, same hash: skip (already imported)
+   - Exists, same hash: skip (already imported). Pre-computed source hash is reused — no double file read.
    - Exists, different hash: **replace** destination (source is truth), log warning
-7. **Handle sidecars:** find matching sidecar files (same base name, extensions from `defaults`), place next to primary file
-8. **Report:** summary at end — imported, skipped, replaced, dropped, errors
+   - With `--no-verify`: if destination exists, skip without comparing — fastest for re-imports
+8. **Handle sidecars:** find matching sidecar files (same base name, extensions from `defaults`), place next to primary file
+9. **Progress:** shows running counts: `new:<N> skipped:<N> dropped:<N>`
+10. **Report:** summary at end — imported, skipped, replaced, dropped, errors
 
 ### Import Flags
 
@@ -164,6 +167,8 @@ Per-file pipeline — no batching, keeps memory flat for 3TB+ libraries:
 - `--year 2025` — only import files from this year (based on EXIF datetime)
 - `--no-fail-fast` — collect all errors instead of stopping at first
 - `--no-separate-video` — put videos in the same device dir as photos
+- `--no-verify` — skip hash verification of existing destination files (faster, less safe)
+- `--no-randomize` — import files in directory order instead of randomized
 - `--hash-algo <algo>` — hash algorithm (default: `md5`)
 
 ## Verify Flow
@@ -181,30 +186,35 @@ Per-file pipeline, same as import:
    - **Processed:** freeform — no validation of contents
    - **Sources-manual:** freeform — no validation of contents
    - OS junk files (`.DS_Store`, etc.) are ignored at all levels.
-3. **Verify source files:** for each file in `sources/`:
-   - Extract metadata, compute expected path (includes content hash)
-   - Compare actual path vs expected path — mismatch is an inconsistency (covers wrong dir, wrong hash, wrong filename)
+3. **Randomize** file order (default on, `--no-randomize` to disable)
+4. **Verify source files** — two modes:
+   - **Full mode (default):** extract metadata, compute expected path (includes content hash), compare actual vs expected — hash correctness is implicit in path match
+   - **Fast mode (`--fast`):** validate filename format and path consistency only, no file reads or hash computation
    - With `--fix`: move file to correct location
-4. **Report:** summary — verified, inconsistent, fixed, errors
+5. **Progress:** shows running counts: `valid:<N> fixed:<N> inconsistent:<N>`
+6. **Report:** summary — verified, inconsistent, fixed, errors
 
 ### Verify Flags
 
 - `--year 2025` — scope to one year
 - `--fix` — repair inconsistencies (move files to correct paths)
-- `--fast` — fast mode: validate filenames and directory structure only, skip hash recomputation and content verification. Useful for quick structural checks on large libraries.
+- `--fast` — fast mode: validate filenames and directory structure only, skip hash recomputation and content verification
+- `--no-randomize` — verify files in directory order instead of randomized
 - `--no-fail-fast` — collect all errors
 
 ## Logging & Progress
 
 ### TTY detected (interactive terminal)
 
-- Interactive progress bar: file count, percentage, current file
-- Warnings printed inline above the progress bar — never buried
+- Interactive progress line with percentage, counts, and current file:
+  - Import: `[45%] 4,521/10,000 new:3200 skipped:1300 dropped:21 photo.jpg`
+  - Verify: `[72%] 7,200/10,000 valid:7100 fixed:0 inconsistent:100 photo.jpg`
+- Warnings printed inline above the progress line — never buried
 - Summary at end with totals
 
 ### Non-TTY (piped, redirected)
 
-- Periodic progress lines to stderr every 10 seconds: `[progress] 4,521/12,340 (36%)`
+- Progress lines to stderr with same format: `[progress] 4,521/10,000 (45%) new:3200 skipped:1300 dropped:21`
 - Warnings/errors to stderr with prefixes: `[warn]`, `[error]`
 - Summary to stdout at end
 
@@ -240,7 +250,7 @@ A `testdata/` directory at repo root with small sample files (real JPEGs, ARWs, 
 ## What Gets Kept/Ported
 
 - `go-exiftool` integration
-- Paranoid hash-verify-on-destination logic from `transfer.go`
+- Paranoid hash-verify-on-destination logic from `transfer.go` (with optimization: pre-computed source hash reused, skippable via `--no-verify`)
 - `cobra` for CLI
 - Docker + CI/CD setup (updated for new structure)
-- `scan` and `diff` logic (moved under `tools`)
+- `scan` and `diff` logic (moved under `tools`, scanner simplified — no include/exclude patterns)
