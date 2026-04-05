@@ -101,13 +101,7 @@ func BuildFileMetadata(path string, exifFields map[string]interface{}, hasher *d
 			}
 		}
 	}
-	if dt.IsZero() {
-		modTime, err := GetFileModTime(path)
-		if err != nil {
-			return nil, fmt.Errorf("get mod time: %w", err)
-		}
-		dt = modTime
-	}
+	// If no EXIF datetime found, dt stays zero (time.Time{}) for determinism
 
 	// Determine Make
 	make_ := getStringField(exifFields, "Make")

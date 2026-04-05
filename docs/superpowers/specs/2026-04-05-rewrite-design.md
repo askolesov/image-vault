@@ -48,7 +48,7 @@ The library is convention-based — no config files, no init command. The tool r
 - **Unknown device:** files with no EXIF make/model go to `Unknown (<media-type>)/`
 - **Media filter:** only photo, video, audio imported by default. Others dropped unless `--keep-all`.
 - **Video separation:** videos are separated into their own device directory by default (e.g., `Apple iPhone 15 Pro (video)/`). Use `--no-separate-video` on import to merge videos into the same device dir as photos.
-- **Missing EXIF datetime:** falls back to file modification time. The file is still imported, not dropped.
+- **Missing EXIF datetime:** falls back to zero time (1970-01-01) for determinism. The file is still imported, not dropped.
 - **Missing EXIF make/model:** file goes to `Unknown (<media-type>)/`.
 
 ### Embedded Configuration

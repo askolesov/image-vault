@@ -143,7 +143,7 @@ func TestFileMetadataFromExifFields(t *testing.T) {
 	assert.Equal(t, 8, len(meta.ShortHash))
 }
 
-func TestFileMetadataFallbackToModTime(t *testing.T) {
+func TestFileMetadataFallbackToZeroTime(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "photo.jpg")
 	err := os.WriteFile(tmpFile, []byte("fake image data"), 0644)
 	require.NoError(t, err)
@@ -158,8 +158,8 @@ func TestFileMetadataFallbackToModTime(t *testing.T) {
 	meta, err := BuildFileMetadata(tmpFile, fields, hasher)
 	require.NoError(t, err)
 
-	// Should fall back to mod time
-	assert.WithinDuration(t, time.Now(), meta.DateTime, 5*time.Second)
+	// Should fall back to zero time for determinism
+	assert.True(t, meta.DateTime.IsZero())
 	// Make should default to "Unknown"
 	assert.Equal(t, "Unknown", meta.Make)
 }
