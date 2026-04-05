@@ -123,81 +123,23 @@ func TestVerifyConsistentLibrary(t *testing.T) {
 }
 
 // TestVerifyProcessedDirValid: valid processed dir → no inconsistencies
-func TestVerifyProcessedDirValid(t *testing.T) {
-	libDir := t.TempDir()
-
-	// Create year dir with a valid processed dir
-	processedDir := filepath.Join(libDir, "2024", "processed", "2024-06-15 summer vacation")
-	require.NoError(t, os.MkdirAll(processedDir, 0o755))
-
-	cfg := Config{
-		LibraryPath: libDir,
-		HashAlgo:    "md5",
-	}
-
-	v := New(cfg, &fakeExtractor{}, newTestLogger())
-	result, err := v.Verify()
-	require.NoError(t, err)
-	assert.Equal(t, 0, result.Inconsistent)
-}
-
-// TestVerifyProcessedDirInvalid: invalid dir name → Inconsistent=1
-func TestVerifyProcessedDirInvalid(t *testing.T) {
-	libDir := t.TempDir()
-
-	// Create year dir with an invalid processed dir name
-	processedDir := filepath.Join(libDir, "2024", "processed", "bad-name-no-date")
-	require.NoError(t, os.MkdirAll(processedDir, 0o755))
-
-	cfg := Config{
-		LibraryPath: libDir,
-		HashAlgo:    "md5",
-		FailFast:    false,
-	}
-
-	v := New(cfg, &fakeExtractor{}, newTestLogger())
-	result, err := v.Verify()
-	require.NoError(t, err)
-	assert.Equal(t, 1, result.Inconsistent)
-}
-
-// TestVerifyYearFilter: filter "2024" → only 2024 checked
 func TestVerifyYearFilter(t *testing.T) {
 	libDir := t.TempDir()
 
-	// Create both 2023 and 2024 with invalid processed dirs
-	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2023", "processed", "bad-name"), 0o755))
-	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "processed", "also-bad"), 0o755))
+	// Create both 2023 and 2024 with invalid device dirs in sources
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2023", "sources", "bad-device"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources", "also-bad"), 0o755))
 
-	cfg := Config{
+	v := New(Config{
 		LibraryPath: libDir,
 		HashAlgo:    "md5",
 		YearFilter:  "2024",
-	}
+		FailFast:    false,
+	}, &fakeExtractor{}, newTestLogger())
 
-	v := New(cfg, &fakeExtractor{}, newTestLogger())
 	result, err := v.Verify()
 	require.NoError(t, err)
 	// Only 2024 is checked, so only 1 inconsistency (not 2)
-	assert.Equal(t, 1, result.Inconsistent)
-}
-
-// TestVerifyProcessedDirWrongYear: "2023-12-25 event" inside 2024/ → Inconsistent=1
-func TestVerifyProcessedDirWrongYear(t *testing.T) {
-	libDir := t.TempDir()
-
-	// Create a processed dir with wrong year
-	processedDir := filepath.Join(libDir, "2024", "processed", "2023-12-25 event")
-	require.NoError(t, os.MkdirAll(processedDir, 0o755))
-
-	cfg := Config{
-		LibraryPath: libDir,
-		HashAlgo:    "md5",
-	}
-
-	v := New(cfg, &fakeExtractor{}, newTestLogger())
-	result, err := v.Verify()
-	require.NoError(t, err)
 	assert.Equal(t, 1, result.Inconsistent)
 }
 
@@ -459,23 +401,6 @@ func TestVerifyExtractErrorFailFast(t *testing.T) {
 }
 
 // TestVerifyProcessedDirFailFast: invalid dir with FailFast → returns error
-func TestVerifyProcessedDirFailFast(t *testing.T) {
-	libDir := t.TempDir()
-
-	processedDir := filepath.Join(libDir, "2024", "processed", "bad-name-no-date")
-	require.NoError(t, os.MkdirAll(processedDir, 0o755))
-
-	cfg := Config{
-		LibraryPath: libDir,
-		HashAlgo:    "md5",
-		FailFast:    true,
-	}
-
-	v := New(cfg, &fakeExtractor{}, newTestLogger())
-	_, err := v.Verify()
-	assert.Error(t, err)
-}
-
 // TestVerifySkipsIgnoredAndSidecarFiles: .DS_Store and .xmp files are skipped
 func TestVerifySkipsIgnoredAndSidecarFiles(t *testing.T) {
 	libDir := t.TempDir()
@@ -800,19 +725,6 @@ func TestVerifyDeviceDirInvalidDateDir(t *testing.T) {
 	assert.Equal(t, 1, result.Inconsistent)
 }
 
-func TestVerifyProcessedUnexpectedFile(t *testing.T) {
-	libDir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
-	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "processed"), 0o755))
-	createTestFile(t, filepath.Join(libDir, "2024", "processed", "stray.txt"), "data")
-
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
-
-	result, err := v.Verify()
-	require.NoError(t, err)
-	assert.Equal(t, 1, result.Inconsistent)
-}
-
 func TestVerifyCleanLibraryNoInconsistencies(t *testing.T) {
 	libDir := t.TempDir()
 	content := "valid image"
@@ -841,6 +753,33 @@ func TestVerifyIgnoredFilesSkippedAtAllLevels(t *testing.T) {
 	createTestFile(t, filepath.Join(libDir, ".DS_Store"), "")
 	createTestFile(t, filepath.Join(libDir, "2024", ".DS_Store"), "")
 	createTestFile(t, filepath.Join(libDir, "2024", "sources", ".DS_Store"), "")
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.Inconsistent)
+}
+
+func TestVerifySourcesManualAllowed(t *testing.T) {
+	libDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources-manual", "phone"), 0o755))
+	createTestFile(t, filepath.Join(libDir, "2024", "sources-manual", "phone", "old-photo.jpg"), "data")
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.Inconsistent)
+}
+
+func TestVerifyProcessedFreeform(t *testing.T) {
+	libDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "processed", "any-name-is-fine"), 0o755))
+	createTestFile(t, filepath.Join(libDir, "2024", "processed", "loose-file.txt"), "data")
+	createTestFile(t, filepath.Join(libDir, "2024", "processed", "any-name-is-fine", "edited.jpg"), "data")
 
 	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
 

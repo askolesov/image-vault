@@ -93,11 +93,6 @@ func (v *Verifier) Verify() (*Result, error) {
 		if err := v.verifySourceFiles(yearDir, year, result); err != nil {
 			return result, err
 		}
-
-		// Validate processed — only dirs with valid names, no files
-		if err := v.verifyProcessedLevel(yearDir, year, result); err != nil {
-			return result, err
-		}
 	}
 
 	return result, nil
@@ -254,7 +249,7 @@ func (v *Verifier) verifyYearLevel(yearDir, year string, result *Result) error {
 		return fmt.Errorf("read year dir %s: %w", year, err)
 	}
 
-	allowed := map[string]bool{"sources": true, "processed": true}
+	allowed := map[string]bool{"sources": true, "processed": true, "sources-manual": true}
 
 	for _, e := range entries {
 		if defaults.IsIgnoredFile(e.Name()) {
@@ -356,37 +351,3 @@ func (v *Verifier) verifyDeviceDir(deviceDir, year, deviceName string, result *R
 	return nil
 }
 
-// verifyProcessedLevel checks that processed/ contains only validly named directories, no files.
-func (v *Verifier) verifyProcessedLevel(yearDir, year string, result *Result) error {
-	processedDir := filepath.Join(yearDir, "processed")
-	entries, err := os.ReadDir(processedDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("read processed dir for %s: %w", year, err)
-	}
-
-	for _, e := range entries {
-		if defaults.IsIgnoredFile(e.Name()) {
-			continue
-		}
-		if !e.IsDir() {
-			result.Inconsistent++
-			v.logger.Warn("unexpected file in %s/processed/: %s", year, e.Name())
-			if v.cfg.FailFast {
-				return fmt.Errorf("unexpected file in %s/processed/: %s", year, e.Name())
-			}
-			continue
-		}
-		if err := pathbuilder.ValidateProcessedDirName(e.Name(), year); err != nil {
-			result.Inconsistent++
-			v.logger.Warn("invalid processed dir in %s: %s (%v)", year, e.Name(), err)
-			if v.cfg.FailFast {
-				return fmt.Errorf("invalid processed dir %q: %w", e.Name(), err)
-			}
-		}
-	}
-
-	return nil
-}

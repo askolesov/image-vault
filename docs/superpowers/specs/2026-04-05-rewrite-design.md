@@ -25,13 +25,14 @@ The library is convention-based — no config files, no init command. The tool r
         ...
       Unknown (image)/
         ...
+    sources-manual/
+      (freeform — for years with no/poor EXIF metadata, manually organized)
     processed/
-      2024-08-20 Summer vacation/
-        (freeform contents)
-      2024-12-25 Christmas dinner/
-        ...
+      (freeform — edited exports, curated output)
   2025/
     sources/
+      ...
+    sources-manual/
       ...
     processed/
       ...
@@ -43,7 +44,8 @@ The library is convention-based — no config files, no init command. The tool r
 - **Device directories:** `<Make> <Model> (<media-type>)` where media-type is `image`, `video`, or `audio` (matching MIME type prefixes)
 - **Date directories:** `YYYY-MM-DD`
 - **Source filenames:** `YYYY-MM-DD_HH-MM-SS_<hash>.<ext>`
-- **Processed directories:** `YYYY-MM-DD <event name>` — strictly one space between date and name
+- **Processed directory:** freeform contents — no naming or structure enforced
+- **Sources-manual directory:** freeform contents — for years with no/poor EXIF metadata, manually organized
 - **Sidecars:** same base name as primary file, sit next to it
 - **Unknown device:** files with no EXIF make/model go to `Unknown (<media-type>)/`
 - **Media filter:** only image, video, audio imported by default. Others dropped unless `--keep-all`.
@@ -171,11 +173,12 @@ Per-file pipeline, same as import:
 1. **Select scope:** if `--year 2025`, only scan `<library>/2025/`. Otherwise all years.
 2. **Validate structure** — strict, no unexpected entries at any level:
    - **Library root:** only YYYY year directories (no files, no other dirs)
-   - **Year level:** only `sources/` and `processed/` (no files, no other dirs)
+   - **Year level:** only `sources/`, `processed/`, and `sources-manual/` (no files, no other dirs)
    - **Sources level:** only valid device directories matching `<Make> [Model] (image|video|audio)` (no files, no other dirs)
    - **Device level:** only valid date directories matching `YYYY-MM-DD` (no files, no other dirs)
    - **Date level:** only valid source filenames and sidecars
-   - **Processed level:** only validly named directories `YYYY-MM-DD <event name>` (no files). Contents inside are freeform.
+   - **Processed:** freeform — no validation of contents
+   - **Sources-manual:** freeform — no validation of contents
    - OS junk files (`.DS_Store`, etc.) are ignored at all levels.
 3. **Verify source files:** for each file in `sources/`:
    - Extract metadata, compute expected path
