@@ -2,6 +2,7 @@ package importer
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
@@ -28,6 +29,8 @@ type Config struct {
 	FailFast      bool
 	Move          bool
 	DryRun        bool
+	SkipCompare   bool
+	Randomize     bool
 	YearFilter    string
 }
 
@@ -77,6 +80,13 @@ func (imp *Importer) ImportDir(sourceDir string) (*Result, error) {
 	}
 
 	groups := linkSidecars(files)
+
+	if imp.cfg.Randomize {
+		rand.Shuffle(len(groups), func(i, j int) {
+			groups[i], groups[j] = groups[j], groups[i]
+		})
+	}
+
 	result := &Result{}
 	total := len(groups)
 
@@ -124,10 +134,11 @@ func (imp *Importer) importFile(g fileWithSidecars, result *Result) error {
 
 	// Transfer — pass hasher and pre-computed source hash to avoid re-reading the file
 	tOpts := transfer.Options{
-		Move:       imp.cfg.Move,
-		DryRun:     imp.cfg.DryRun,
-		NewHash:    imp.hasher.New,
-		SourceHash: md.FullHash,
+		Move:        imp.cfg.Move,
+		DryRun:      imp.cfg.DryRun,
+		NewHash:     imp.hasher.New,
+		SourceHash:  md.FullHash,
+		SkipCompare: imp.cfg.SkipCompare,
 	}
 
 	action, err := transfer.TransferFile(g.Path, destPath, tOpts)

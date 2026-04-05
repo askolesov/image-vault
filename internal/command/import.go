@@ -20,6 +20,8 @@ func newImportCmd() *cobra.Command {
 		year            string
 		noFailFast      bool
 		noSeparateVideo bool
+		noVerify        bool
+		noRandomize     bool
 		hashAlgo        string
 	)
 
@@ -54,6 +56,8 @@ func newImportCmd() *cobra.Command {
 				FailFast:      !noFailFast,
 				Move:          move,
 				DryRun:        dryRun,
+				SkipCompare:   noVerify,
+				Randomize:     !noRandomize,
 				YearFilter:    year,
 			}
 
@@ -81,6 +85,8 @@ func newImportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&year, "year", "", "Only import files from this year")
 	cmd.Flags().BoolVar(&noFailFast, "no-fail-fast", false, "Continue on errors instead of stopping")
 	cmd.Flags().BoolVar(&noSeparateVideo, "no-separate-video", false, "Do not separate video files into a different directory")
+	cmd.Flags().BoolVar(&noVerify, "no-verify", false, "Skip hash verification of existing destination files (faster, less safe)")
+	cmd.Flags().BoolVar(&noRandomize, "no-randomize", false, "Import files in directory order instead of randomized")
 	cmd.Flags().StringVar(&hashAlgo, "hash-algo", defaults.DefaultHashAlgorithm, "Hash algorithm to use (md5, sha256)")
 
 	return cmd

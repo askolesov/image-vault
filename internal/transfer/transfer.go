@@ -34,6 +34,9 @@ type Options struct {
 	// SourceHash is a pre-computed full hex hash of the source file (using NewHash).
 	// When set, the source file is not re-read for comparison.
 	SourceHash string
+	// SkipCompare skips hash comparison when destination exists.
+	// If destination exists, the file is assumed identical and skipped.
+	SkipCompare bool
 }
 
 // TransferFile copies or moves source to target with paranoid hash verification.
@@ -65,6 +68,19 @@ func TransferFile(source, target string, opts Options) (Action, error) {
 	// Check if target exists
 	_, statErr := os.Stat(target)
 	targetExists := statErr == nil
+
+	if targetExists && opts.SkipCompare {
+		if opts.Move {
+			if opts.DryRun {
+				return ActionWouldMove, nil
+			}
+			if err := os.Remove(source); err != nil {
+				return "", fmt.Errorf("remove source: %w", err)
+			}
+			return ActionMoved, nil
+		}
+		return ActionSkipped, nil
+	}
 
 	if targetExists {
 		identical, err := compareFiles(source, target, opts.NewHash, opts.SourceHash)
