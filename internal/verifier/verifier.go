@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/askolesov/image-vault/internal/defaults"
 	"github.com/askolesov/image-vault/internal/library"
@@ -122,7 +123,47 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, result *Result) error
 			continue
 		}
 
-		// Fast mode: validate filename format only, no hash verification
+		// Structural consistency: filename date must match date dir,
+		// date dir year must match year level
+		sourcesDir := filepath.Join(yearDir, "sources")
+		relToSources, err := filepath.Rel(sourcesDir, filePath)
+		if err != nil {
+			result.Errors++
+			v.logger.Error("resolve relative path %s: %v", filePath, err)
+			continue
+		}
+
+		// relToSources is like: "Device (image)/2024-08-20/2024-08-20_18-45-03_abc123.jpg"
+		parts := strings.Split(filepath.ToSlash(relToSources), "/")
+		if len(parts) >= 3 {
+			dateDir := parts[len(parts)-2]
+
+			// Date dir year must match year level
+			if len(dateDir) >= 4 && dateDir[:4] != year {
+				result.Inconsistent++
+				v.logger.Warn("date dir %s has wrong year (expected %s): %s", dateDir, year, filePath)
+				if v.cfg.FailFast {
+					return fmt.Errorf("date dir %s has wrong year in %s", dateDir, filePath)
+				}
+				continue
+			}
+
+			// Filename date must match date dir
+			parsed, parseErr := pathbuilder.ParseSourceFilename(baseName)
+			if parseErr == nil {
+				fileDate := parsed.DateTime.Format("2006-01-02")
+				if fileDate != dateDir {
+					result.Inconsistent++
+					v.logger.Warn("filename date %s doesn't match date dir %s: %s", fileDate, dateDir, filePath)
+					if v.cfg.FailFast {
+						return fmt.Errorf("filename date mismatch in %s", filePath)
+					}
+					continue
+				}
+			}
+		}
+
+		// Fast mode: validate filename format, skip content verification
 		if v.cfg.Fast {
 			_, err := pathbuilder.ParseSourceFilename(baseName)
 			if err != nil {

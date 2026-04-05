@@ -177,13 +177,13 @@ Per-file pipeline, same as import:
    - **Sources level:** only valid device directories matching `<Make> [Model] (image|video|audio)` (no files, no other dirs)
    - **Device level:** only valid date directories matching `YYYY-MM-DD` (no files, no other dirs)
    - **Date level:** only valid source filenames and sidecars
+   - **Path consistency:** date dir year must match parent year dir; filename date must match parent date dir
    - **Processed:** freeform — no validation of contents
    - **Sources-manual:** freeform — no validation of contents
    - OS junk files (`.DS_Store`, etc.) are ignored at all levels.
 3. **Verify source files:** for each file in `sources/`:
-   - Extract metadata, compute expected path
-   - Compare actual path vs expected path — mismatch is an inconsistency
-   - Re-hash file, confirm hash in filename matches actual content
+   - Extract metadata, compute expected path (includes content hash)
+   - Compare actual path vs expected path — mismatch is an inconsistency (covers wrong dir, wrong hash, wrong filename)
    - With `--fix`: move file to correct location
 4. **Report:** summary — verified, inconsistent, fixed, errors
 

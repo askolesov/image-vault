@@ -787,3 +787,51 @@ func TestVerifyProcessedFreeform(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.Inconsistent)
 }
+
+func TestVerifyDateDirYearMismatch(t *testing.T) {
+	libDir := t.TempDir()
+	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)")
+	createTestFile(t, filepath.Join(deviceDir, "2023-06-15", "2023-06-15_12-00-00_abcd1234.jpg"), "data")
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, result.Inconsistent, 1)
+}
+
+func TestVerifyFilenameDateMismatchDateDir(t *testing.T) {
+	libDir := t.TempDir()
+	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)")
+	createTestFile(t, filepath.Join(deviceDir, "2024-08-20", "2024-08-21_12-00-00_abcd1234.jpg"), "data")
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, result.Inconsistent, 1)
+}
+
+func TestVerifyDateDirYearMismatchFastMode(t *testing.T) {
+	libDir := t.TempDir()
+	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)")
+	createTestFile(t, filepath.Join(deviceDir, "2023-06-15", "2023-06-15_12-00-00_abcd1234.jpg"), "data")
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false, Fast: true}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, result.Inconsistent, 1)
+}
+
+func TestVerifyFilenameDateMismatchFastMode(t *testing.T) {
+	libDir := t.TempDir()
+	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)")
+	createTestFile(t, filepath.Join(deviceDir, "2024-08-20", "2024-08-21_12-00-00_abcd1234.jpg"), "data")
+
+	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false, Fast: true}, &fakeExtractor{}, newTestLogger())
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, result.Inconsistent, 1)
+}
