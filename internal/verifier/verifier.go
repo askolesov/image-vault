@@ -2,6 +2,7 @@ package verifier
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +28,7 @@ type Config struct {
 	FailFast      bool
 	Fix           bool
 	Fast          bool
+	Randomize     bool
 	YearFilter    string
 }
 
@@ -104,6 +106,12 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, result *Result) error
 	files, err := library.ListSourceFiles(yearDir)
 	if err != nil {
 		return fmt.Errorf("list source files for %s: %w", year, err)
+	}
+
+	if v.cfg.Randomize {
+		rand.Shuffle(len(files), func(i, j int) {
+			files[i], files[j] = files[j], files[i]
+		})
 	}
 
 	total := len(files)
