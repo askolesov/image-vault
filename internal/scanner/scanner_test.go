@@ -13,12 +13,10 @@ func setupTestDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 
-	// Create files.
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "photo1.jpg"), []byte("jpeg data"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "photo2.png"), []byte("png data"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("text"), 0o644))
 
-	// Create a subdirectory with files.
 	subDir := filepath.Join(dir, "subdir")
 	require.NoError(t, os.Mkdir(subDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(subDir, "photo3.jpg"), []byte("more jpeg"), 0o644))
@@ -30,7 +28,7 @@ func setupTestDir(t *testing.T) string {
 func TestScanDirectory_AllFiles(t *testing.T) {
 	dir := setupTestDir(t)
 
-	s := NewScanner(nil, nil)
+	s := NewScanner()
 	result, err := s.ScanDirectory(dir, nil)
 	require.NoError(t, err)
 
@@ -40,39 +38,7 @@ func TestScanDirectory_AllFiles(t *testing.T) {
 	assert.Equal(t, 6, len(result.Files))
 }
 
-func TestScanDirectory_IncludePatterns(t *testing.T) {
-	dir := setupTestDir(t)
-
-	s := NewScanner([]string{"*.jpg"}, nil)
-	result, err := s.ScanDirectory(dir, nil)
-	require.NoError(t, err)
-
-	// Should include: subdir (dir, always included), photo1.jpg, photo3.jpg
-	fileNames := make([]string, 0, len(result.Files))
-	for _, f := range result.Files {
-		if !f.IsDir {
-			fileNames = append(fileNames, filepath.Base(f.Path))
-		}
-	}
-	assert.ElementsMatch(t, []string{"photo1.jpg", "photo3.jpg"}, fileNames)
-}
-
-func TestScanDirectory_ExcludePatterns(t *testing.T) {
-	dir := setupTestDir(t)
-
-	s := NewScanner(nil, []string{"*.txt", "*.md"})
-	result, err := s.ScanDirectory(dir, nil)
-	require.NoError(t, err)
-
-	for _, f := range result.Files {
-		base := filepath.Base(f.Path)
-		assert.NotEqual(t, "notes.txt", base)
-		assert.NotEqual(t, "readme.md", base)
-	}
-}
-
 func TestScanDirectory_ProgressCallback(t *testing.T) {
-	// Create a dir with enough files to trigger callback.
 	dir := t.TempDir()
 	for i := range 150 {
 		name := filepath.Join(dir, filepath.Base(t.Name())+string(rune('a'+i/26))+string(rune('a'+i%26))+".txt")
@@ -80,7 +46,7 @@ func TestScanDirectory_ProgressCallback(t *testing.T) {
 	}
 
 	var callbackCalled bool
-	s := NewScanner(nil, nil)
+	s := NewScanner()
 	_, err := s.ScanDirectory(dir, func(p ProgressInfo) {
 		callbackCalled = true
 		assert.Greater(t, p.FilesScanned, 0)
@@ -92,7 +58,7 @@ func TestScanDirectory_ProgressCallback(t *testing.T) {
 func TestSaveAndLoadFromFile(t *testing.T) {
 	dir := setupTestDir(t)
 
-	s := NewScanner(nil, nil)
+	s := NewScanner()
 	result, err := s.ScanDirectory(dir, nil)
 	require.NoError(t, err)
 
@@ -104,61 +70,6 @@ func TestSaveAndLoadFromFile(t *testing.T) {
 	assert.Equal(t, result.TotalFiles, loaded.TotalFiles)
 	assert.Equal(t, result.TotalSize, loaded.TotalSize)
 	assert.Equal(t, len(result.Files), len(loaded.Files))
-}
-
-func TestShouldIncludeFile(t *testing.T) {
-	s := NewScanner([]string{"*.jpg", "*.png"}, []string{"*.tmp"})
-
-	assert.True(t, s.shouldIncludeFile("photo.jpg", false))
-	assert.True(t, s.shouldIncludeFile("image.png", false))
-	assert.False(t, s.shouldIncludeFile("notes.txt", false))
-	assert.False(t, s.shouldIncludeFile("cache.tmp", false))
-	// Directories should always be included when include patterns are set.
-	assert.True(t, s.shouldIncludeFile("subdir", true))
-}
-
-func TestShouldIncludeFile_NoPatterns(t *testing.T) {
-	s := NewScanner(nil, nil)
-
-	assert.True(t, s.shouldIncludeFile("anything.txt", false))
-	assert.True(t, s.shouldIncludeFile("photo.jpg", false))
-	assert.True(t, s.shouldIncludeFile("dir", true))
-}
-
-func TestShouldIncludeFile_ExcludeDir(t *testing.T) {
-	s := NewScanner(nil, []string{"node_modules"})
-
-	assert.False(t, s.shouldIncludeFile("node_modules", true))
-	assert.True(t, s.shouldIncludeFile("src", true))
-}
-
-func TestMatchPattern_PathSeparator(t *testing.T) {
-	// Pattern with / should match against full relative path
-	assert.True(t, matchPattern("subdir/*.jpg", "photo.jpg", "subdir/photo.jpg"))
-	assert.False(t, matchPattern("subdir/*.jpg", "photo.jpg", "other/photo.jpg"))
-}
-
-func TestMatchPattern_BaseName(t *testing.T) {
-	// Pattern without / should match against base name
-	assert.True(t, matchPattern("*.jpg", "photo.jpg", "some/path/photo.jpg"))
-	assert.False(t, matchPattern("*.png", "photo.jpg", "some/path/photo.jpg"))
-}
-
-func TestScanDirectory_ExcludeSubdir(t *testing.T) {
-	dir := t.TempDir()
-	require.NoError(t, os.Mkdir(filepath.Join(dir, "include"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "include", "a.txt"), []byte("data"), 0o644))
-	require.NoError(t, os.Mkdir(filepath.Join(dir, "exclude"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "exclude", "b.txt"), []byte("data"), 0o644))
-
-	s := NewScanner(nil, []string{"exclude"})
-	result, err := s.ScanDirectory(dir, nil)
-	require.NoError(t, err)
-
-	// Should only contain include dir and a.txt
-	for _, f := range result.Files {
-		assert.NotContains(t, f.Path, "exclude")
-	}
 }
 
 func TestLoadFromFile_NotFound(t *testing.T) {
