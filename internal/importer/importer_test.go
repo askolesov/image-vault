@@ -78,7 +78,7 @@ func TestImportSingleFile(t *testing.T) {
 	assert.Equal(t, 0, result.Errors)
 
 	// Verify file landed in correct structure: <year>/sources/<device>/<date>/<filename>
-	matches, _ := filepath.Glob(filepath.Join(libDir, "2024", "sources", "TestMake TestModel (photo)", "2024-01-15", "*.jpg"))
+	matches, _ := filepath.Glob(filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", "*.jpg"))
 	assert.Len(t, matches, 1)
 }
 
@@ -213,7 +213,7 @@ func TestImportWithSidecars(t *testing.T) {
 	assert.Equal(t, 1, result.Imported)
 
 	// Verify sidecar placed next to primary
-	matches, _ := filepath.Glob(filepath.Join(libDir, "2024", "sources", "TestMake TestModel (photo)", "2024-01-15", "*.xmp"))
+	matches, _ := filepath.Glob(filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", "*.xmp"))
 	assert.Len(t, matches, 1)
 }
 

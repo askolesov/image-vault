@@ -12,7 +12,7 @@ import (
 type MediaType string
 
 const (
-	MediaTypePhoto MediaType = "photo"
+	MediaTypePhoto MediaType = "image"
 	MediaTypeVideo MediaType = "video"
 	MediaTypeAudio MediaType = "audio"
 	MediaTypeOther MediaType = "other"

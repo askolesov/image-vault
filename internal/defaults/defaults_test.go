@@ -136,7 +136,7 @@ func TestDefaultHashAlgorithm(t *testing.T) {
 }
 
 func TestMediaTypeConstants(t *testing.T) {
-	assert.Equal(t, MediaType("photo"), MediaTypePhoto)
+	assert.Equal(t, MediaType("image"), MediaTypePhoto)
 	assert.Equal(t, MediaType("video"), MediaTypeVideo)
 	assert.Equal(t, MediaType("audio"), MediaTypeAudio)
 	assert.Equal(t, MediaType("other"), MediaTypeOther)

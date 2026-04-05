@@ -28,7 +28,7 @@ func TestBuildSourcePath(t *testing.T) {
 				Extension: ".jpg",
 			},
 			opts:     Options{SeparateVideo: true},
-			expected: "2024/sources/Apple iPhone 15 Pro (photo)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.jpg",
+			expected: "2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.jpg",
 		},
 		{
 			name: "video separate",
@@ -54,7 +54,7 @@ func TestBuildSourcePath(t *testing.T) {
 				Extension: ".mp4",
 			},
 			opts:     Options{SeparateVideo: false},
-			expected: "2024/sources/Apple iPhone 15 Pro (photo)/2024-08-20/2024-08-20_18-45-03_d4e5f6a7.mp4",
+			expected: "2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_d4e5f6a7.mp4",
 		},
 		{
 			name: "unknown make no model",
@@ -67,7 +67,7 @@ func TestBuildSourcePath(t *testing.T) {
 				Extension: ".jpg",
 			},
 			opts:     Options{},
-			expected: "2025/sources/Unknown (photo)/2025-03-15/2025-03-15_10-30-00_abcd1234.jpg",
+			expected: "2025/sources/Unknown (image)/2025-03-15/2025-03-15_10-30-00_abcd1234.jpg",
 		},
 		{
 			name: "audio file",
@@ -93,7 +93,7 @@ func TestBuildSourcePath(t *testing.T) {
 				Extension: ".arw",
 			},
 			opts:     Options{},
-			expected: "2024/sources/Sony (photo)/2024-01-01/2024-01-01_00-00-00_11223344.arw",
+			expected: "2024/sources/Sony (image)/2024-01-01/2024-01-01_00-00-00_11223344.arw",
 		},
 	}
 
@@ -106,8 +106,8 @@ func TestBuildSourcePath(t *testing.T) {
 }
 
 func TestBuildSidecarPath(t *testing.T) {
-	result := BuildSidecarPath("2024/sources/Apple iPhone 15 Pro (photo)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.jpg", ".xmp")
-	assert.Equal(t, "2024/sources/Apple iPhone 15 Pro (photo)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.xmp", result)
+	result := BuildSidecarPath("2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.jpg", ".xmp")
+	assert.Equal(t, "2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.xmp", result)
 }
 
 func TestBuildSourceFilename(t *testing.T) {
@@ -129,14 +129,14 @@ func TestDeviceDir(t *testing.T) {
 			make_:     "Apple",
 			model:     "iPhone 15 Pro",
 			mediaType: defaults.MediaTypePhoto,
-			expected:  "Apple iPhone 15 Pro (photo)",
+			expected:  "Apple iPhone 15 Pro (image)",
 		},
 		{
 			name:      "no model",
 			make_:     "Sony",
 			model:     "",
 			mediaType: defaults.MediaTypePhoto,
-			expected:  "Sony (photo)",
+			expected:  "Sony (image)",
 		},
 		{
 			name:      "video type",

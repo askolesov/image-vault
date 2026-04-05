@@ -229,7 +229,7 @@ func TestVerifyPathMismatch(t *testing.T) {
 	relPath := pathbuilder.BuildSourcePath(md, pathbuilder.Options{SeparateVideo: false})
 
 	// Place the file at a WRONG path within the same year sources dir
-	wrongPath := filepath.Join(libDir, "2024", "sources", "WrongDevice (photo)", "2024-01-15",
+	wrongPath := filepath.Join(libDir, "2024", "sources", "WrongDevice (image)", "2024-01-15",
 		pathbuilder.BuildSourceFilename(dt, short, ".jpg"))
 	createTestFile(t, wrongPath, content)
 
@@ -412,7 +412,7 @@ func TestVerifyExtractError(t *testing.T) {
 	libDir := t.TempDir()
 
 	// Create a source file
-	srcFile := filepath.Join(libDir, "2024", "sources", "TestMake TestModel (photo)", "2024-01-15", "2024-01-15_12-00-00_abcd1234.jpg")
+	srcFile := filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", "2024-01-15_12-00-00_abcd1234.jpg")
 	createTestFile(t, srcFile, "content")
 
 	cfg := Config{
@@ -430,7 +430,7 @@ func TestVerifyExtractError(t *testing.T) {
 func TestVerifyExtractErrorFailFast(t *testing.T) {
 	libDir := t.TempDir()
 
-	srcFile := filepath.Join(libDir, "2024", "sources", "TestMake TestModel (photo)", "2024-01-15", "2024-01-15_12-00-00_abcd1234.jpg")
+	srcFile := filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", "2024-01-15_12-00-00_abcd1234.jpg")
 	createTestFile(t, srcFile, "content")
 
 	cfg := Config{
@@ -466,7 +466,7 @@ func TestVerifyProcessedDirFailFast(t *testing.T) {
 func TestVerifySkipsIgnoredAndSidecarFiles(t *testing.T) {
 	libDir := t.TempDir()
 
-	sourcesDir := filepath.Join(libDir, "2024", "sources", "TestMake TestModel (photo)", "2024-01-15")
+	sourcesDir := filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15")
 	createTestFile(t, filepath.Join(sourcesDir, ".DS_Store"), "junk")
 	createTestFile(t, filepath.Join(sourcesDir, "photo.xmp"), "sidecar-data")
 
@@ -489,7 +489,7 @@ func TestVerifySourceFileWithBadFilename(t *testing.T) {
 	libDir := t.TempDir()
 
 	// Create a source file with a name that doesn't match the expected pattern
-	badFile := filepath.Join(libDir, "2024", "sources", "TestMake TestModel (photo)", "2024-01-15", "random-name.jpg")
+	badFile := filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", "random-name.jpg")
 	createTestFile(t, badFile, "data")
 
 	hasher := mustHasher("md5")
@@ -556,7 +556,7 @@ func TestVerifyPathMismatchFixError(t *testing.T) {
 	dt := time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
 
 	// Place file at wrong path
-	wrongPath := filepath.Join(libDir, "2024", "sources", "WrongDevice (photo)", "2024-01-15",
+	wrongPath := filepath.Join(libDir, "2024", "sources", "WrongDevice (image)", "2024-01-15",
 		pathbuilder.BuildSourceFilename(dt, short, ".jpg"))
 	createTestFile(t, wrongPath, content)
 
