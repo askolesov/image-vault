@@ -12,7 +12,7 @@ The library is convention-based — no config files, no init command. The tool r
 /my-library/
   2024/
     sources/
-      Apple iPhone 15 Pro (photo)/
+      Apple iPhone 15 Pro (image)/
         2024-08-20/
           2024-08-20_18-45-03_a1b2c3.jpg
           2024-08-20_18-45-03_a1b2c3.xmp
@@ -21,9 +21,9 @@ The library is convention-based — no config files, no init command. The tool r
       Apple iPhone 15 Pro (video)/
         2024-12-25/
           2024-12-25_10-00-15_d4e5f6.mp4
-      Sony ILCE-7M3 (photo)/
+      Sony ILCE-7M3 (image)/
         ...
-      Unknown (photo)/
+      Unknown (image)/
         ...
     processed/
       2024-08-20 Summer vacation/
@@ -40,14 +40,14 @@ The library is convention-based — no config files, no init command. The tool r
 ### Naming Rules
 
 - **Year directories:** `YYYY`
-- **Device directories:** `<Make> <Model> (<media-type>)` where media-type is `photo`, `video`, or `audio`
+- **Device directories:** `<Make> <Model> (<media-type>)` where media-type is `image`, `video`, or `audio` (matching MIME type prefixes)
 - **Date directories:** `YYYY-MM-DD`
 - **Source filenames:** `YYYY-MM-DD_HH-MM-SS_<hash>.<ext>`
 - **Processed directories:** `YYYY-MM-DD <event name>` — strictly one space between date and name
 - **Sidecars:** same base name as primary file, sit next to it
 - **Unknown device:** files with no EXIF make/model go to `Unknown (<media-type>)/`
 - **Media filter:** only photo, video, audio imported by default. Others dropped unless `--keep-all`.
-- **Video separation:** videos are separated into their own device directory by default (e.g., `Apple iPhone 15 Pro (video)/`). Use `--no-separate-video` on import to merge videos into the same device dir as photos.
+- **Video separation:** videos are separated into their own device directory by default (e.g., `Apple iPhone 15 Pro (video)/`). Use `--no-separate-video` on import to merge videos into the same device dir as images.
 - **Missing EXIF datetime:** falls back to zero time (1970-01-01) for determinism. The file is still imported, not dropped.
 - **Missing EXIF make/model:** file goes to `Unknown (<media-type>)/`.
 
