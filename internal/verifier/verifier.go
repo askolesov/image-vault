@@ -34,10 +34,11 @@ type Config struct {
 
 // Result holds the outcome counts of a verify operation.
 type Result struct {
-	Verified     int
-	Inconsistent int
-	Fixed        int
-	Errors       int
+	Verified       int
+	Inconsistent   int
+	Fixed          int
+	Errors         int
+	ProcessedBytes int64
 }
 
 // Verifier orchestrates integrity checks on the library.
@@ -115,14 +116,13 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, result *Result) error
 	}
 
 	total := len(files)
-	var processedBytes int64
 	for i, filePath := range files {
 		stats := fmt.Sprintf("valid:%d fixed:%d inconsistent:%d %s",
-			result.Verified, result.Fixed, result.Inconsistent, logging.FormatBytes(processedBytes))
+			result.Verified, result.Fixed, result.Inconsistent, logging.FormatBytes(result.ProcessedBytes))
 		v.logger.ProgressWithStats(i+1, total, stats, filePath)
 
 		if info, err := os.Stat(filePath); err == nil {
-			processedBytes += info.Size()
+			result.ProcessedBytes += info.Size()
 		}
 
 		baseName := filepath.Base(filePath)

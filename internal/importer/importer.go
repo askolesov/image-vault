@@ -36,11 +36,12 @@ type Config struct {
 
 // Result holds the outcome counts of an import operation.
 type Result struct {
-	Imported int
-	Skipped  int
-	Replaced int
-	Dropped  int
-	Errors   int
+	Imported       int
+	Skipped        int
+	Replaced       int
+	Dropped        int
+	Errors         int
+	ProcessedBytes int64
 }
 
 // fileWithSidecars groups a primary file with its sidecar files.
@@ -89,15 +90,14 @@ func (imp *Importer) ImportDir(sourceDir string) (*Result, error) {
 
 	result := &Result{}
 	total := len(groups)
-	var processedBytes int64
 
 	for i, g := range groups {
 		stats := fmt.Sprintf("new:%d skipped:%d dropped:%d %s",
-			result.Imported, result.Skipped, result.Dropped, logging.FormatBytes(processedBytes))
+			result.Imported, result.Skipped, result.Dropped, logging.FormatBytes(result.ProcessedBytes))
 		imp.logger.ProgressWithStats(i+1, total, stats, g.Path)
 
 		if info, err := os.Stat(g.Path); err == nil {
-			processedBytes += info.Size()
+			result.ProcessedBytes += info.Size()
 		}
 
 		if err := imp.importFile(g, result); err != nil {

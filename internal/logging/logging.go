@@ -9,14 +9,16 @@ import (
 
 // Summary holds counts for a batch operation.
 type Summary struct {
-	TotalFiles int
-	Imported   int
-	Skipped    int
-	Replaced   int
-	Dropped    int
-	Errors     int
-	Fixed      int
-	Verified   int
+	TotalFiles     int
+	Imported       int
+	Skipped        int
+	Replaced       int
+	Dropped        int
+	Inconsistent   int
+	Errors         int
+	Fixed          int
+	Verified       int
+	ProcessedBytes int64
 }
 
 // Logger provides TTY-aware structured output.
@@ -122,6 +124,7 @@ func (l *Logger) PrintSummary(s Summary) {
 		{"Skipped", s.Skipped},
 		{"Replaced", s.Replaced},
 		{"Dropped", s.Dropped},
+		{"Inconsistent", s.Inconsistent},
 		{"Fixed", s.Fixed},
 		{"Errors", s.Errors},
 	}
@@ -132,6 +135,9 @@ func (l *Logger) PrintSummary(s Summary) {
 		if f.value != 0 {
 			_, _ = fmt.Fprintf(l.stdout, "%s: %s\n", f.label, formatNumber(f.value))
 		}
+	}
+	if s.ProcessedBytes > 0 {
+		_, _ = fmt.Fprintf(l.stdout, "Processed: %s\n", FormatBytes(s.ProcessedBytes))
 	}
 }
 

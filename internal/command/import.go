@@ -68,11 +68,12 @@ func newImportCmd() *cobra.Command {
 			}
 
 			logger.PrintSummary(logging.Summary{
-				Imported: result.Imported,
-				Skipped:  result.Skipped,
-				Replaced: result.Replaced,
-				Dropped:  result.Dropped,
-				Errors:   result.Errors,
+				Imported:       result.Imported,
+				Skipped:        result.Skipped,
+				Replaced:       result.Replaced,
+				Dropped:        result.Dropped,
+				Errors:         result.Errors,
+				ProcessedBytes: result.ProcessedBytes,
 			})
 
 			return nil
