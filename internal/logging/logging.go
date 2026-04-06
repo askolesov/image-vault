@@ -7,18 +7,10 @@ import (
 	"sync"
 )
 
-// Summary holds counts for a batch operation.
-type Summary struct {
-	TotalFiles     int
-	Imported       int
-	Skipped        int
-	Replaced       int
-	Dropped        int
-	Inconsistent   int
-	Errors         int
-	Fixed          int
-	Verified       int
-	ProcessedBytes int64
+// SummaryField is a single label-value pair for the summary output.
+type SummaryField struct {
+	Label string
+	Value string
 }
 
 // Logger provides TTY-aware structured output.
@@ -77,9 +69,9 @@ func (l *Logger) Progress(current, total int, currentFile string) {
 	defer l.mu.Unlock()
 	if l.isTTY {
 		file := truncate(currentFile, 40)
-		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[%d%%] %s/%s %s", pct, formatNumber(current), formatNumber(total), file)
+		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[%d%%] %s/%s %s", pct, FormatNumber(current), FormatNumber(total), file)
 	} else {
-		_, _ = fmt.Fprintf(l.stderr, "[progress] %s/%s (%d%%)\n", formatNumber(current), formatNumber(total), pct)
+		_, _ = fmt.Fprintf(l.stderr, "[progress] %s/%s (%d%%)\n", FormatNumber(current), FormatNumber(total), pct)
 	}
 }
 
@@ -93,9 +85,9 @@ func (l *Logger) ProgressWithStats(current, total int, stats, currentFile string
 	defer l.mu.Unlock()
 	if l.isTTY {
 		file := truncate(currentFile, 40)
-		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[%d%%] %s/%s %s %s", pct, formatNumber(current), formatNumber(total), stats, file)
+		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[%d%%] %s/%s %s %s", pct, FormatNumber(current), FormatNumber(total), stats, file)
 	} else {
-		_, _ = fmt.Fprintf(l.stderr, "[progress] %s/%s (%d%%) %s\n", formatNumber(current), formatNumber(total), pct, stats)
+		_, _ = fmt.Fprintf(l.stderr, "[progress] %s/%s (%d%%) %s\n", FormatNumber(current), FormatNumber(total), pct, stats)
 	}
 }
 
@@ -108,36 +100,14 @@ func (l *Logger) ClearProgress() {
 	}
 }
 
-// PrintSummary prints a summary to stdout, showing only non-zero fields.
-func (l *Logger) PrintSummary(s Summary) {
+// PrintSummary prints all provided fields to stdout.
+func (l *Logger) PrintSummary(fields []SummaryField) {
 	l.ClearProgress()
-
-	type field struct {
-		label string
-		value int
-	}
-
-	fields := []field{
-		{"Total files", s.TotalFiles},
-		{"Imported", s.Imported},
-		{"Verified", s.Verified},
-		{"Skipped", s.Skipped},
-		{"Replaced", s.Replaced},
-		{"Dropped", s.Dropped},
-		{"Inconsistent", s.Inconsistent},
-		{"Fixed", s.Fixed},
-		{"Errors", s.Errors},
-	}
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, f := range fields {
-		if f.value != 0 {
-			_, _ = fmt.Fprintf(l.stdout, "%s: %s\n", f.label, formatNumber(f.value))
-		}
-	}
-	if s.ProcessedBytes > 0 {
-		_, _ = fmt.Fprintf(l.stdout, "Processed: %s\n", FormatBytes(s.ProcessedBytes))
+		_, _ = fmt.Fprintf(l.stdout, "%s: %s\n", f.Label, f.Value)
 	}
 }
 
@@ -155,8 +125,8 @@ func (l *Logger) ErrorCount() int {
 	return l.errorCount
 }
 
-// formatNumber adds comma separators to an integer (e.g., 12345 → "12,345").
-func formatNumber(n int) string {
+// FormatNumber adds comma separators to an integer (e.g., 12345 → "12,345").
+func FormatNumber(n int) string {
 	s := strconv.Itoa(n)
 	if len(s) <= 3 {
 		return s

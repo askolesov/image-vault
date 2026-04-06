@@ -56,12 +56,12 @@ func newVerifyCmd() *cobra.Command {
 				return err
 			}
 
-			logger.PrintSummary(logging.Summary{
-				Verified:       result.Verified,
-				Inconsistent:   result.Inconsistent,
-				Fixed:          result.Fixed,
-				Errors:         result.Errors,
-				ProcessedBytes: result.ProcessedBytes,
+			logger.PrintSummary([]logging.SummaryField{
+				{Label: "Verified", Value: logging.FormatNumber(result.Verified)},
+				{Label: "Inconsistent", Value: logging.FormatNumber(result.Inconsistent)},
+				{Label: "Fixed", Value: logging.FormatNumber(result.Fixed)},
+				{Label: "Errors", Value: logging.FormatNumber(result.Errors)},
+				{Label: "Processed", Value: logging.FormatBytes(result.ProcessedBytes)},
 			})
 
 			if result.Inconsistent > 0 && !fix {
