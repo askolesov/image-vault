@@ -142,23 +142,28 @@ func FormatNumber(n int) string {
 	return string(result)
 }
 
-// FormatBytes formats a byte count as a human-readable string (B, KB, MB, GB, TB).
+// FormatBytes formats a byte count as a human-readable string using the largest
+// unit plus MB remainder for granularity (e.g., "1 TB 203 GB", "15 GB 742 MB").
 func FormatBytes(b int64) string {
 	const (
-		kb = 1024
-		mb = 1024 * kb
-		gb = 1024 * mb
-		tb = 1024 * gb
+		kb int64 = 1024
+		mb       = 1024 * kb
+		gb       = 1024 * mb
+		tb       = 1024 * gb
 	)
 	switch {
 	case b >= tb:
-		return fmt.Sprintf("%.1f TB", float64(b)/float64(tb))
+		tbVal := b / tb
+		gbVal := (b % tb) / gb
+		return fmt.Sprintf("%d TB %d GB", tbVal, gbVal)
 	case b >= gb:
-		return fmt.Sprintf("%.1f GB", float64(b)/float64(gb))
+		gbVal := b / gb
+		mbVal := (b % gb) / mb
+		return fmt.Sprintf("%d GB %d MB", gbVal, mbVal)
 	case b >= mb:
-		return fmt.Sprintf("%.1f MB", float64(b)/float64(mb))
+		return fmt.Sprintf("%d MB", b/mb)
 	case b >= kb:
-		return fmt.Sprintf("%.1f KB", float64(b)/float64(kb))
+		return fmt.Sprintf("%d KB", b/kb)
 	default:
 		return fmt.Sprintf("%d B", b)
 	}

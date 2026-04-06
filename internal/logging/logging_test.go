@@ -42,7 +42,7 @@ func TestLoggerSummary(t *testing.T) {
 		{Label: "Replaced", Value: FormatNumber(50)},
 		{Label: "Dropped", Value: FormatNumber(0)},
 		{Label: "Errors", Value: FormatNumber(3)},
-		{Label: "Processed", Value: FormatBytes(1258291200)},
+		{Label: "Processed", Value: FormatBytes(1283457024)}, // 1 GB 200 MB
 	})
 
 	out := stdout.String()
@@ -51,7 +51,7 @@ func TestLoggerSummary(t *testing.T) {
 	assert.Contains(t, out, "Replaced: 50")
 	assert.Contains(t, out, "Dropped: 0")
 	assert.Contains(t, out, "Errors: 3")
-	assert.Contains(t, out, "Processed: 1.2 GB")
+	assert.Contains(t, out, "Processed: 1 GB 200 MB")
 }
 
 func TestLoggerWarningsCollected(t *testing.T) {
