@@ -36,27 +36,22 @@ func TestLoggerSummary(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	l := New(&stdout, &stderr, false)
 
-	l.PrintSummary(Summary{
-		TotalFiles: 1500,
-		Imported:   1200,
-		Skipped:    100,
-		Replaced:   50,
-		Dropped:    0,
-		Errors:     3,
-		Fixed:      0,
-		Verified:   1200,
+	l.PrintSummary([]SummaryField{
+		{Label: "Imported", Value: FormatNumber(1200)},
+		{Label: "Skipped", Value: FormatNumber(100)},
+		{Label: "Replaced", Value: FormatNumber(50)},
+		{Label: "Dropped", Value: FormatNumber(0)},
+		{Label: "Errors", Value: FormatNumber(3)},
+		{Label: "Processed", Value: FormatBytes(1283457024)}, // 1 GB 200 MB
 	})
 
 	out := stdout.String()
-	assert.Contains(t, out, "Total files: 1,500")
 	assert.Contains(t, out, "Imported: 1,200")
-	assert.Contains(t, out, "Verified: 1,200")
 	assert.Contains(t, out, "Skipped: 100")
 	assert.Contains(t, out, "Replaced: 50")
+	assert.Contains(t, out, "Dropped: 0")
 	assert.Contains(t, out, "Errors: 3")
-	// Zero fields should not appear
-	assert.NotContains(t, out, "Dropped")
-	assert.NotContains(t, out, "Fixed")
+	assert.Contains(t, out, "Processed: 1 GB 200 MB")
 }
 
 func TestLoggerWarningsCollected(t *testing.T) {
@@ -94,7 +89,7 @@ func TestFormatNumber(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
-			result := formatNumber(tt.input)
+			result := FormatNumber(tt.input)
 			require.Equal(t, tt.expected, result)
 		})
 	}
@@ -202,17 +197,18 @@ func TestLoggerSummaryWithFixedAndVerified(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	l := New(&stdout, &stderr, false)
 
-	l.PrintSummary(Summary{
-		TotalFiles: 100,
-		Fixed:      5,
-		Verified:   95,
+	l.PrintSummary([]SummaryField{
+		{Label: "Verified", Value: FormatNumber(95)},
+		{Label: "Inconsistent", Value: FormatNumber(0)},
+		{Label: "Fixed", Value: FormatNumber(5)},
+		{Label: "Errors", Value: FormatNumber(0)},
+		{Label: "Processed", Value: FormatBytes(0)},
 	})
 
 	out := stdout.String()
-	assert.Contains(t, out, "Total files: 100")
-	assert.Contains(t, out, "Fixed: 5")
 	assert.Contains(t, out, "Verified: 95")
-	// Zero fields should not appear
-	assert.NotContains(t, out, "Imported")
-	assert.NotContains(t, out, "Skipped")
+	assert.Contains(t, out, "Fixed: 5")
+	assert.Contains(t, out, "Inconsistent: 0")
+	assert.Contains(t, out, "Errors: 0")
+	assert.Contains(t, out, "Processed: 0 B")
 }

@@ -7,16 +7,10 @@ import (
 	"sync"
 )
 
-// Summary holds counts for a batch operation.
-type Summary struct {
-	TotalFiles int
-	Imported   int
-	Skipped    int
-	Replaced   int
-	Dropped    int
-	Errors     int
-	Fixed      int
-	Verified   int
+// SummaryField is a single label-value pair for the summary output.
+type SummaryField struct {
+	Label string
+	Value string
 }
 
 // Logger provides TTY-aware structured output.
@@ -75,9 +69,9 @@ func (l *Logger) Progress(current, total int, currentFile string) {
 	defer l.mu.Unlock()
 	if l.isTTY {
 		file := truncate(currentFile, 40)
-		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[%d%%] %s/%s %s", pct, formatNumber(current), formatNumber(total), file)
+		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[%d%%] %s/%s %s", pct, FormatNumber(current), FormatNumber(total), file)
 	} else {
-		_, _ = fmt.Fprintf(l.stderr, "[progress] %s/%s (%d%%)\n", formatNumber(current), formatNumber(total), pct)
+		_, _ = fmt.Fprintf(l.stderr, "[progress] %s/%s (%d%%)\n", FormatNumber(current), FormatNumber(total), pct)
 	}
 }
 
@@ -91,9 +85,9 @@ func (l *Logger) ProgressWithStats(current, total int, stats, currentFile string
 	defer l.mu.Unlock()
 	if l.isTTY {
 		file := truncate(currentFile, 40)
-		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[%d%%] %s/%s %s %s", pct, formatNumber(current), formatNumber(total), stats, file)
+		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[%d%%] %s/%s %s %s", pct, FormatNumber(current), FormatNumber(total), stats, file)
 	} else {
-		_, _ = fmt.Fprintf(l.stderr, "[progress] %s/%s (%d%%) %s\n", formatNumber(current), formatNumber(total), pct, stats)
+		_, _ = fmt.Fprintf(l.stderr, "[progress] %s/%s (%d%%) %s\n", FormatNumber(current), FormatNumber(total), pct, stats)
 	}
 }
 
@@ -106,32 +100,14 @@ func (l *Logger) ClearProgress() {
 	}
 }
 
-// PrintSummary prints a summary to stdout, showing only non-zero fields.
-func (l *Logger) PrintSummary(s Summary) {
+// PrintSummary prints all provided fields to stdout.
+func (l *Logger) PrintSummary(fields []SummaryField) {
 	l.ClearProgress()
-
-	type field struct {
-		label string
-		value int
-	}
-
-	fields := []field{
-		{"Total files", s.TotalFiles},
-		{"Imported", s.Imported},
-		{"Verified", s.Verified},
-		{"Skipped", s.Skipped},
-		{"Replaced", s.Replaced},
-		{"Dropped", s.Dropped},
-		{"Fixed", s.Fixed},
-		{"Errors", s.Errors},
-	}
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, f := range fields {
-		if f.value != 0 {
-			_, _ = fmt.Fprintf(l.stdout, "%s: %s\n", f.label, formatNumber(f.value))
-		}
+		_, _ = fmt.Fprintf(l.stdout, "%s: %s\n", f.Label, f.Value)
 	}
 }
 
@@ -149,8 +125,8 @@ func (l *Logger) ErrorCount() int {
 	return l.errorCount
 }
 
-// formatNumber adds comma separators to an integer (e.g., 12345 → "12,345").
-func formatNumber(n int) string {
+// FormatNumber adds comma separators to an integer (e.g., 12345 → "12,345").
+func FormatNumber(n int) string {
 	s := strconv.Itoa(n)
 	if len(s) <= 3 {
 		return s
@@ -166,23 +142,28 @@ func formatNumber(n int) string {
 	return string(result)
 }
 
-// FormatBytes formats a byte count as a human-readable string (B, KB, MB, GB, TB).
+// FormatBytes formats a byte count as a human-readable string using the largest
+// unit plus MB remainder for granularity (e.g., "1 TB 203 GB", "15 GB 742 MB").
 func FormatBytes(b int64) string {
 	const (
-		kb = 1024
-		mb = 1024 * kb
-		gb = 1024 * mb
-		tb = 1024 * gb
+		kb int64 = 1024
+		mb       = 1024 * kb
+		gb       = 1024 * mb
+		tb       = 1024 * gb
 	)
 	switch {
 	case b >= tb:
-		return fmt.Sprintf("%.1f TB", float64(b)/float64(tb))
+		tbVal := b / tb
+		gbVal := (b % tb) / gb
+		return fmt.Sprintf("%d TB %d GB", tbVal, gbVal)
 	case b >= gb:
-		return fmt.Sprintf("%.1f GB", float64(b)/float64(gb))
+		gbVal := b / gb
+		mbVal := (b % gb) / mb
+		return fmt.Sprintf("%d GB %d MB", gbVal, mbVal)
 	case b >= mb:
-		return fmt.Sprintf("%.1f MB", float64(b)/float64(mb))
+		return fmt.Sprintf("%d MB", b/mb)
 	case b >= kb:
-		return fmt.Sprintf("%.1f KB", float64(b)/float64(kb))
+		return fmt.Sprintf("%d KB", b/kb)
 	default:
 		return fmt.Sprintf("%d B", b)
 	}
