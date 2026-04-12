@@ -75,8 +75,8 @@ func (l *Logger) Progress(current, total int, currentFile string) {
 	}
 }
 
-// ProgressWithStats displays progress with an arbitrary stats string.
-func (l *Logger) ProgressWithStats(current, total int, stats, currentFile string) {
+// ProgressWithStats displays progress with an optional prefix and an arbitrary stats string.
+func (l *Logger) ProgressWithStats(current, total int, prefix, stats, currentFile string) {
 	pct := 0
 	if total > 0 {
 		pct = current * 100 / total
@@ -85,9 +85,9 @@ func (l *Logger) ProgressWithStats(current, total int, stats, currentFile string
 	defer l.mu.Unlock()
 	if l.isTTY {
 		file := truncate(currentFile, 40)
-		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[%d%%] %s/%s %s %s", pct, FormatNumber(current), FormatNumber(total), stats, file)
+		_, _ = fmt.Fprintf(l.stderr, "\r\033[K%s[%d%%] %s/%s %s %s", prefix, pct, FormatNumber(current), FormatNumber(total), stats, file)
 	} else {
-		_, _ = fmt.Fprintf(l.stderr, "[progress] %s/%s (%d%%) %s\n", FormatNumber(current), FormatNumber(total), pct, stats)
+		_, _ = fmt.Fprintf(l.stderr, "[progress] %s%s/%s (%d%%) %s\n", prefix, FormatNumber(current), FormatNumber(total), pct, stats)
 	}
 }
 

@@ -94,7 +94,7 @@ func (imp *Importer) ImportDir(sourceDir string) (*Result, error) {
 	for i, g := range groups {
 		stats := fmt.Sprintf("new:%d skipped:%d dropped:%d %s",
 			result.Imported, result.Skipped, result.Dropped, logging.FormatBytes(result.ProcessedBytes))
-		imp.logger.ProgressWithStats(i+1, total, stats, g.Path)
+		imp.logger.ProgressWithStats(i+1, total, "", stats, g.Path)
 
 		if info, err := os.Stat(g.Path); err == nil {
 			result.ProcessedBytes += info.Size()
