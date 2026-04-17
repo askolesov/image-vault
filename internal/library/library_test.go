@@ -242,6 +242,32 @@ func TestRemoveEmptyDirsDeepNesting(t *testing.T) {
 	assert.DirExists(t, dir)
 }
 
+func TestRemoveEmptyDirsOuterBecomesEmpty(t *testing.T) {
+	dir := t.TempDir()
+	// outer contains only inner (which is empty) — both should be removed
+	makeDir(t, dir, "outer/inner")
+
+	count, err := RemoveEmptyDirs(dir)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+	assert.NoDirExists(t, filepath.Join(dir, "outer"))
+}
+
+func TestRemoveEmptyDirsProgress(t *testing.T) {
+	dir := t.TempDir()
+	makeDir(t, dir, "a/b")
+	makeDir(t, dir, "c")
+
+	var calls []int
+	progress := func(checked, total int) {
+		calls = append(calls, checked)
+	}
+
+	_, err := RemoveEmptyDirs(dir, progress)
+	require.NoError(t, err)
+	assert.Equal(t, []int{1, 2, 3}, calls)
+}
+
 func TestIsDirEffectivelyEmptyOnlyOSFiles(t *testing.T) {
 	dir := t.TempDir()
 	makeDir(t, dir, "junkdir")

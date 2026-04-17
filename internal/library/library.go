@@ -112,9 +112,13 @@ func ListProcessedDirs(yearDir string) ([]string, error) {
 	return dirs, nil
 }
 
+// RemoveEmptyDirsProgress is called during RemoveEmptyDirs to report progress.
+// It receives the number of directories checked so far and the total to check.
+type RemoveEmptyDirsProgress func(checked, total int)
+
 // RemoveEmptyDirs walks bottom-up and removes directories that contain only OS junk files
 // or nothing. Returns count of directories removed.
-func RemoveEmptyDirs(root string) (int, error) {
+func RemoveEmptyDirs(root string, progressFn ...RemoveEmptyDirsProgress) (int, error) {
 	// Collect all directories
 	var allDirs []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -136,8 +140,17 @@ func RemoveEmptyDirs(root string) (int, error) {
 	// Sort reverse so deepest dirs come first
 	sort.Sort(sort.Reverse(sort.StringSlice(allDirs)))
 
+	var cb RemoveEmptyDirsProgress
+	if len(progressFn) > 0 {
+		cb = progressFn[0]
+	}
+
 	count := 0
-	for _, dir := range allDirs {
+	total := len(allDirs)
+	for i, dir := range allDirs {
+		if cb != nil {
+			cb(i+1, total)
+		}
 		empty, err := isDirEffectivelyEmpty(dir)
 		if err != nil {
 			return count, err
