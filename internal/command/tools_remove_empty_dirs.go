@@ -19,8 +19,13 @@ func newToolsRemoveEmptyDirsCmd() *cobra.Command {
 				return fmt.Errorf("get working directory: %w", err)
 			}
 
-			progress := func(checked, total int) {
-				fmt.Fprintf(os.Stderr, "\rChecking directories: %d/%d", checked, total)
+			progress := library.RemoveEmptyDirsProgress{
+				OnDiscover: func(found int) {
+					fmt.Fprintf(os.Stderr, "\rDiscovering directories: %d", found)
+				},
+				OnCheck: func(checked, total int) {
+					fmt.Fprintf(os.Stderr, "\rChecking directories: %d/%d", checked, total)
+				},
 			}
 
 			count, err := library.RemoveEmptyDirs(cwd, progress)

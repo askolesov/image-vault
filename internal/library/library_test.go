@@ -258,14 +258,21 @@ func TestRemoveEmptyDirsProgress(t *testing.T) {
 	makeDir(t, dir, "a/b")
 	makeDir(t, dir, "c")
 
-	var calls []int
-	progress := func(checked, total int) {
-		calls = append(calls, checked)
+	var discovered []int
+	var checked []int
+	p := RemoveEmptyDirsProgress{
+		OnDiscover: func(found int) {
+			discovered = append(discovered, found)
+		},
+		OnCheck: func(ch, total int) {
+			checked = append(checked, ch)
+		},
 	}
 
-	_, err := RemoveEmptyDirs(dir, progress)
+	_, err := RemoveEmptyDirs(dir, p)
 	require.NoError(t, err)
-	assert.Equal(t, []int{1, 2, 3}, calls)
+	assert.Equal(t, []int{1, 2, 3}, discovered)
+	assert.Equal(t, []int{1, 2, 3}, checked)
 }
 
 func TestIsDirEffectivelyEmptyOnlyOSFiles(t *testing.T) {
