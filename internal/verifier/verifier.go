@@ -80,7 +80,7 @@ func (v *Verifier) Verify() (*Result, error) {
 		}
 	}
 
-	for _, year := range years {
+	for i, year := range years {
 		yearDir := filepath.Join(v.cfg.LibraryPath, year)
 
 		// Validate year level — only sources/ and processed/ allowed
@@ -94,7 +94,7 @@ func (v *Verifier) Verify() (*Result, error) {
 		}
 
 		// Validate individual source files
-		if err := v.verifySourceFiles(yearDir, year, result); err != nil {
+		if err := v.verifySourceFiles(yearDir, year, i+1, len(years), result); err != nil {
 			return result, err
 		}
 	}
@@ -103,7 +103,7 @@ func (v *Verifier) Verify() (*Result, error) {
 }
 
 // verifySourceFiles checks each file in sources/ for correct path and hash.
-func (v *Verifier) verifySourceFiles(yearDir, year string, result *Result) error {
+func (v *Verifier) verifySourceFiles(yearDir, year string, yearIdx, yearTotal int, result *Result) error {
 	files, err := library.ListSourceFiles(yearDir)
 	if err != nil {
 		return fmt.Errorf("list source files for %s: %w", year, err)
@@ -117,9 +117,10 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, result *Result) error
 
 	total := len(files)
 	for i, filePath := range files {
+		prefix := fmt.Sprintf("[%s %d/%d] ", year, yearIdx, yearTotal)
 		stats := fmt.Sprintf("valid:%d fixed:%d inconsistent:%d %s",
 			result.Verified, result.Fixed, result.Inconsistent, logging.FormatBytes(result.ProcessedBytes))
-		v.logger.ProgressWithStats(i+1, total, stats, filePath)
+		v.logger.ProgressWithStats(i+1, total, prefix, stats, filePath)
 
 		if info, err := os.Stat(filePath); err == nil {
 			result.ProcessedBytes += info.Size()

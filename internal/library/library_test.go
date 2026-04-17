@@ -104,7 +104,7 @@ func TestRemoveEmptyDirs(t *testing.T) {
 	makeDir(t, dir, "a/b/d")
 	makeFile(t, dir, "a/keep.txt", "data")
 
-	count, err := RemoveEmptyDirs(dir)
+	count, err := RemoveEmptyDirs(dir, RemoveEmptyDirsProgress{})
 	require.NoError(t, err)
 	assert.Greater(t, count, 0)
 
@@ -119,7 +119,7 @@ func TestRemoveEmptyDirsIgnoresOSFiles(t *testing.T) {
 	makeDir(t, dir, "empty-with-junk")
 	makeFile(t, dir, "empty-with-junk/.DS_Store", "junk")
 
-	count, err := RemoveEmptyDirs(dir)
+	count, err := RemoveEmptyDirs(dir, RemoveEmptyDirsProgress{})
 	require.NoError(t, err)
 	assert.Greater(t, count, 0)
 	assert.NoDirExists(t, filepath.Join(dir, "empty-with-junk"))
@@ -203,7 +203,7 @@ func TestRemoveEmptyDirsNoEmptyDirs(t *testing.T) {
 	makeFile(t, dir, "a/file.txt", "data")
 	makeFile(t, dir, "b/file.txt", "data")
 
-	count, err := RemoveEmptyDirs(dir)
+	count, err := RemoveEmptyDirs(dir, RemoveEmptyDirsProgress{})
 	require.NoError(t, err)
 	assert.Equal(t, 0, count)
 }
@@ -234,12 +234,45 @@ func TestRemoveEmptyDirsDeepNesting(t *testing.T) {
 	dir := t.TempDir()
 	makeDir(t, dir, "a/b/c/d/e")
 
-	count, err := RemoveEmptyDirs(dir)
+	count, err := RemoveEmptyDirs(dir, RemoveEmptyDirsProgress{})
 	require.NoError(t, err)
 	// All empty nested dirs should be removed
 	assert.Equal(t, 5, count)
 	// Root should still exist
 	assert.DirExists(t, dir)
+}
+
+func TestRemoveEmptyDirsOuterBecomesEmpty(t *testing.T) {
+	dir := t.TempDir()
+	// outer contains only inner (which is empty) — both should be removed
+	makeDir(t, dir, "outer/inner")
+
+	count, err := RemoveEmptyDirs(dir, RemoveEmptyDirsProgress{})
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+	assert.NoDirExists(t, filepath.Join(dir, "outer"))
+}
+
+func TestRemoveEmptyDirsProgress(t *testing.T) {
+	dir := t.TempDir()
+	makeDir(t, dir, "a/b")
+	makeDir(t, dir, "c")
+
+	var discovered []int
+	var checked []int
+	p := RemoveEmptyDirsProgress{
+		OnDiscover: func(found int) {
+			discovered = append(discovered, found)
+		},
+		OnCheck: func(ch, total int) {
+			checked = append(checked, ch)
+		},
+	}
+
+	_, err := RemoveEmptyDirs(dir, p)
+	require.NoError(t, err)
+	assert.Equal(t, []int{1, 2, 3}, discovered)
+	assert.Equal(t, []int{1, 2, 3}, checked)
 }
 
 func TestIsDirEffectivelyEmptyOnlyOSFiles(t *testing.T) {
@@ -284,7 +317,7 @@ func TestRemoveEmptyDirsPermissionError(t *testing.T) {
 
 	// RemoveEmptyDirs will encounter a permission error when checking restricted/
 	// Some dirs may be removed before the error
-	_, err := RemoveEmptyDirs(dir)
+	_, err := RemoveEmptyDirs(dir, RemoveEmptyDirsProgress{})
 	assert.Error(t, err)
 }
 

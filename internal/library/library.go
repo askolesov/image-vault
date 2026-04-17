@@ -112,9 +112,18 @@ func ListProcessedDirs(yearDir string) ([]string, error) {
 	return dirs, nil
 }
 
+// RemoveEmptyDirsProgress reports progress during RemoveEmptyDirs.
+type RemoveEmptyDirsProgress struct {
+	// OnDiscover is called during directory discovery with the count found so far.
+	OnDiscover func(found int)
+	// OnCheck is called during the check/remove phase with checked and total counts.
+	OnCheck func(checked, total int)
+}
+
 // RemoveEmptyDirs walks bottom-up and removes directories that contain only OS junk files
 // or nothing. Returns count of directories removed.
-func RemoveEmptyDirs(root string) (int, error) {
+func RemoveEmptyDirs(root string, p RemoveEmptyDirsProgress) (int, error) {
+
 	// Collect all directories
 	var allDirs []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -126,6 +135,9 @@ func RemoveEmptyDirs(root string) (int, error) {
 		}
 		if d.IsDir() && path != root {
 			allDirs = append(allDirs, path)
+			if p.OnDiscover != nil {
+				p.OnDiscover(len(allDirs))
+			}
 		}
 		return nil
 	})
@@ -137,7 +149,11 @@ func RemoveEmptyDirs(root string) (int, error) {
 	sort.Sort(sort.Reverse(sort.StringSlice(allDirs)))
 
 	count := 0
-	for _, dir := range allDirs {
+	total := len(allDirs)
+	for i, dir := range allDirs {
+		if p.OnCheck != nil {
+			p.OnCheck(i+1, total)
+		}
 		empty, err := isDirEffectivelyEmpty(dir)
 		if err != nil {
 			return count, err

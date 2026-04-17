@@ -97,7 +97,7 @@ func TestEndToEnd_ImportThenVerify(t *testing.T) {
 	assert.Equal(t, 1, result2.Skipped, "re-import should skip the duplicate")
 
 	// 8. RemoveEmptyDirs → assert 0 removed
-	removed, err := library.RemoveEmptyDirs(libDir)
+	removed, err := library.RemoveEmptyDirs(libDir, library.RemoveEmptyDirsProgress{})
 	require.NoError(t, err)
 	assert.Equal(t, 0, removed, "no empty dirs expected in a populated library")
 
