@@ -122,11 +122,7 @@ type RemoveEmptyDirsProgress struct {
 
 // RemoveEmptyDirs walks bottom-up and removes directories that contain only OS junk files
 // or nothing. Returns count of directories removed.
-func RemoveEmptyDirs(root string, progress ...RemoveEmptyDirsProgress) (int, error) {
-	var p RemoveEmptyDirsProgress
-	if len(progress) > 0 {
-		p = progress[0]
-	}
+func RemoveEmptyDirs(root string, p RemoveEmptyDirsProgress) (int, error) {
 
 	// Collect all directories
 	var allDirs []string
