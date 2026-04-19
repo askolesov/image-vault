@@ -345,6 +345,8 @@ func (v *Verifier) verifySourceFiles(
 					result.Fixed++
 					// Deliberately not caching fixed files — they'll re-verify next run.
 				}
+			} else if v.cfg.FailFast {
+				return fmt.Errorf("path mismatch: %s should be at %s", absActual, absExpected)
 			}
 		}
 	}
