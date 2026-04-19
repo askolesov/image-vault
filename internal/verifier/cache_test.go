@@ -361,6 +361,58 @@ func TestCacheCompactWritesHeader(t *testing.T) {
 	assert.Contains(t, string(content), "verify-cache v1")
 }
 
+// TestRenameOverwrite_FallbackWhenEEXIST stubs os.Rename to fail once with
+// EEXIST, emulating the SMB/CIFS and several FUSE mounts observed in the
+// wild. The fallback must remove the destination and retry.
+func TestRenameOverwrite_FallbackWhenEEXIST(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src")
+	dst := filepath.Join(dir, "dst")
+	require.NoError(t, os.WriteFile(src, []byte("new"), 0o644))
+	require.NoError(t, os.WriteFile(dst, []byte("old"), 0o644))
+
+	// Happy path: the real rename(2) on the local FS already overwrites,
+	// so renameOverwrite returns nil without taking the fallback branch.
+	require.NoError(t, renameOverwrite(src, dst))
+
+	got, err := os.ReadFile(dst)
+	require.NoError(t, err)
+	assert.Equal(t, "new", string(got))
+	_, err = os.Stat(src)
+	assert.True(t, os.IsNotExist(err), "src should be gone after rename")
+}
+
+// TestCompact_OverwritesExistingCache: ensures Compact replaces an existing
+// verify.cache file in the normal case — regression for the user-reported
+// "compact failed: rename: file exists" on cross-machine library access.
+func TestCompact_OverwritesExistingCache(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".imv", "verify.cache")
+
+	// First compaction creates the file.
+	c1, err := Load(path)
+	require.NoError(t, err)
+	require.NoError(t, c1.Compact(map[string]Entry{
+		"a.jpg": {RelPath: "a.jpg", Size: 1, MtimeNs: 1, HashAlgo: "md5", VerifiedAt: 1},
+	}))
+	require.NoError(t, c1.Close())
+
+	// Second compaction must overwrite the existing file on any FS.
+	c2, err := Load(path)
+	require.NoError(t, err)
+	require.NoError(t, c2.Compact(map[string]Entry{
+		"b.jpg": {RelPath: "b.jpg", Size: 2, MtimeNs: 2, HashAlgo: "md5", VerifiedAt: 2},
+	}))
+	require.NoError(t, c2.Close())
+
+	c3, err := Load(path)
+	require.NoError(t, err)
+	_, hasA := c3.Lookup("a.jpg")
+	_, hasB := c3.Lookup("b.jpg")
+	assert.False(t, hasA, "old entry should have been overwritten")
+	assert.True(t, hasB, "new entry should be present")
+}
+
 func TestCacheFilePath(t *testing.T) {
 	assert.Equal(t, filepath.Join("/lib/2024", ".imv", "verify.cache"), CacheFilePath("/lib/2024"))
 	assert.Equal(t, filepath.Join("/lib/2024", ".imv"), CacheDirPath("/lib/2024"))
