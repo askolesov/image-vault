@@ -89,22 +89,15 @@ func Load(path string) (*Cache, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			debugLog("load: %q missing; starting empty", path)
 			return c, nil
 		}
-		debugLog("load: open %q failed: %v", path, err)
 		return nil, fmt.Errorf("open cache: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
-	if fi, err := f.Stat(); err == nil {
-		debugLog("load: %q size=%d mtime=%s", path, fi.Size(), fi.ModTime().Format(time.RFC3339))
-	}
-
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 
-	var malformed int
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -112,17 +105,14 @@ func Load(path string) (*Cache, error) {
 		}
 		e, ok := parseCacheLine(line)
 		if !ok {
-			malformed++
 			continue
 		}
 		c.entries[e.RelPath] = e
 	}
 	if err := scanner.Err(); err != nil {
-		debugLog("load: scan error: %v", err)
 		return c, fmt.Errorf("scan cache: %w", err)
 	}
 
-	debugLog("load ok: %q entries=%d malformed=%d", path, len(c.entries), malformed)
 	return c, nil
 }
 
@@ -169,17 +159,14 @@ func (c *Cache) Compact(keep map[string]Entry) error {
 	if c == nil {
 		return nil
 	}
-	debugLog("compact start: path=%q keep=%d", c.path, len(keep))
 
 	if err := os.MkdirAll(filepath.Dir(c.path), 0o755); err != nil {
-		debugLog("compact: mkdir failed: %v", err)
 		return fmt.Errorf("mkdir cache dir: %w", err)
 	}
 
 	tmpPath := c.path + ".tmp"
 	tmp, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
-		debugLog("compact: open tmp %q failed: %v", tmpPath, err)
 		return fmt.Errorf("create tmp cache: %w", err)
 	}
 
@@ -210,10 +197,8 @@ func (c *Cache) Compact(keep map[string]Entry) error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("close tmp cache: %w", err)
 	}
-	debugLog("compact: tmp written ok at %q", tmpPath)
 
 	if err := renameOverwrite(tmpPath, c.path); err != nil {
-		debugLog("compact: renameOverwrite failed: %v", err)
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("rename cache: %w", err)
 	}
@@ -223,13 +208,11 @@ func (c *Cache) Compact(keep map[string]Entry) error {
 
 	f, err := os.OpenFile(c.path, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
-		debugLog("compact: reopen for append failed: %v", err)
 		return fmt.Errorf("reopen cache for append: %w", err)
 	}
 	c.file = f
 	c.buf = bufio.NewWriter(f)
 	c.lastFlush = time.Now()
-	debugLog("compact ok: path=%q entries=%d", c.path, len(c.entries))
 
 	return nil
 }
@@ -312,23 +295,10 @@ func (c *Cache) Close() error {
 // cache, not durable state.
 func renameOverwrite(src, dst string) error {
 	if err := os.Rename(src, dst); err == nil {
-		debugLog("rename: %q -> %q ok", src, dst)
 		return nil
-	} else {
-		debugLog("rename failed: %q -> %q: %v; retrying with remove", src, dst, err)
 	}
 	_ = os.Remove(dst)
 	return os.Rename(src, dst)
-}
-
-// debugLog writes a diagnostic line to stderr when IMV_DEBUG is set. Used
-// to trace cache-path decisions without polluting normal output. The test
-// suite leaves IMV_DEBUG unset, so output is silent during CI.
-func debugLog(format string, args ...any) {
-	if os.Getenv("IMV_DEBUG") == "" {
-		return
-	}
-	_, _ = fmt.Fprintf(os.Stderr, "[imv-debug] "+format+"\n", args...)
 }
 
 func writeCacheHeader(w *bufio.Writer) error {

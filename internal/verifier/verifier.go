@@ -169,27 +169,17 @@ func (v *Verifier) openYearCache(yearDir, year string, entries []FileEntry) *Cac
 		return nil
 	}
 
-	loaded := len(c.entries)
 	keep := make(map[string]Entry)
-	var matchMiss, lookupMiss int
 	for _, fe := range entries {
 		existing, ok := c.Lookup(fe.RelToYear)
 		if !ok {
-			lookupMiss++
 			continue
 		}
 		if !c.Matches(existing, fe.Info, v.cfg.HashAlgo) {
-			matchMiss++
-			debugLog("openYearCache: %s match miss: cached=(size=%d mtime=%d algo=%s) disk=(size=%d mtime=%d algo=%s)",
-				fe.RelToYear,
-				existing.Size, existing.MtimeNs, existing.HashAlgo,
-				fe.Info.Size(), fe.Info.ModTime().UnixNano(), v.cfg.HashAlgo)
 			continue
 		}
 		keep[fe.RelToYear] = existing
 	}
-	debugLog("openYearCache[%s]: loaded=%d entries=%d keep=%d lookupMiss=%d matchMiss=%d",
-		year, loaded, len(entries), len(keep), lookupMiss, matchMiss)
 
 	if err := c.Compact(keep); err != nil {
 		v.logger.Warn("cache for %s: compact failed: %v (continuing without cache)", year, err)
