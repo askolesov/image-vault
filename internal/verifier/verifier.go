@@ -277,7 +277,10 @@ func (v *Verifier) verifySourceFiles(
 		if len(parts) >= 4 && parts[0] == "sources" {
 			dateDir := parts[len(parts)-2]
 
-			if len(dateDir) >= 4 && dateDir[:4] != year {
+			// A date dir must start with YYYY matching the year level. A
+			// shorter or mismatched prefix is always inconsistent; don't
+			// silently pass when len(dateDir) < 4.
+			if len(dateDir) < 4 || dateDir[:4] != year {
 				result.Inconsistent++
 				v.logger.Warn("date dir %s has wrong year (expected %s): %s", dateDir, year, filePath)
 				if v.cfg.FailFast {

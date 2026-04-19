@@ -19,6 +19,9 @@ const (
 )
 
 // IgnoredFiles is the list of OS-generated junk files to ignore.
+// Treat as read-only after package init — the derived lookup set is
+// built once in init() and is not updated if the slice is mutated at
+// runtime. Use IsIgnoredFile to query; do not append.
 var IgnoredFiles = []string{
 	".DS_Store",
 	"Thumbs.db",
@@ -46,6 +49,7 @@ func IsIgnoredFile(name string) bool {
 }
 
 // SidecarExtensions is the list of recognized sidecar file extensions.
+// Treat as read-only after package init — see IgnoredFiles.
 var SidecarExtensions = []string{".xmp", ".yaml", ".json"}
 
 var sidecarExtSet map[string]struct{}
