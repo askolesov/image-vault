@@ -9,7 +9,6 @@ import (
 // CompareOptions controls which fields are considered during comparison.
 type CompareOptions struct {
 	SkipModifiedTime bool
-	SkipCreatedTime  bool
 }
 
 // FilePair holds the source and target versions of a file that exists in both scans.

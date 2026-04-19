@@ -72,12 +72,12 @@ func TestCompareScans_ModifiedBySize(t *testing.T) {
 
 	source := &scanner.ScanResult{
 		Files: []scanner.FileInfo{
-			{Path: "a.jpg", Size: 100, Modified: now, Created: now},
+			{Path: "a.jpg", Size: 100, Modified: now},
 		},
 	}
 	target := &scanner.ScanResult{
 		Files: []scanner.FileInfo{
-			{Path: "a.jpg", Size: 200, Modified: now, Created: now},
+			{Path: "a.jpg", Size: 200, Modified: now},
 		},
 	}
 
@@ -97,12 +97,12 @@ func TestCompareScans_ModifiedByModTime(t *testing.T) {
 
 	source := &scanner.ScanResult{
 		Files: []scanner.FileInfo{
-			{Path: "a.jpg", Size: 100, Modified: t1, Created: t1},
+			{Path: "a.jpg", Size: 100, Modified: t1},
 		},
 	}
 	target := &scanner.ScanResult{
 		Files: []scanner.FileInfo{
-			{Path: "a.jpg", Size: 100, Modified: t2, Created: t1},
+			{Path: "a.jpg", Size: 100, Modified: t2},
 		},
 	}
 
@@ -114,49 +114,24 @@ func TestCompareScans_ModifiedByModTime(t *testing.T) {
 	assert.Equal(t, 0, report2.Summary.ModifiedFiles)
 }
 
-func TestCompareScans_ModifiedByCreateTime(t *testing.T) {
+func TestCompareScans_SkipModifiedTime(t *testing.T) {
 	d := NewDiffer()
 	t1 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	t2 := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 
 	source := &scanner.ScanResult{
 		Files: []scanner.FileInfo{
-			{Path: "a.jpg", Size: 100, Modified: t1, Created: t1},
+			{Path: "a.jpg", Size: 100, Modified: t1},
 		},
 	}
 	target := &scanner.ScanResult{
 		Files: []scanner.FileInfo{
-			{Path: "a.jpg", Size: 100, Modified: t1, Created: t2},
-		},
-	}
-
-	report := d.CompareScans(source, target, "s", "t", CompareOptions{})
-	assert.Equal(t, 1, report.Summary.ModifiedFiles)
-
-	// With SkipCreatedTime, no modification detected
-	report2 := d.CompareScans(source, target, "s", "t", CompareOptions{SkipCreatedTime: true})
-	assert.Equal(t, 0, report2.Summary.ModifiedFiles)
-}
-
-func TestCompareScans_SkipBothTimes(t *testing.T) {
-	d := NewDiffer()
-	t1 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	t2 := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
-
-	source := &scanner.ScanResult{
-		Files: []scanner.FileInfo{
-			{Path: "a.jpg", Size: 100, Modified: t1, Created: t1},
-		},
-	}
-	target := &scanner.ScanResult{
-		Files: []scanner.FileInfo{
-			{Path: "a.jpg", Size: 100, Modified: t2, Created: t2},
+			{Path: "a.jpg", Size: 100, Modified: t2},
 		},
 	}
 
 	report := d.CompareScans(source, target, "s", "t", CompareOptions{
 		SkipModifiedTime: true,
-		SkipCreatedTime:  true,
 	})
 	assert.Equal(t, 0, report.Summary.ModifiedFiles)
 }
@@ -237,8 +212,8 @@ func TestCompareScanFiles(t *testing.T) {
 		ScanDate: now,
 		RootPath: "/src",
 		Files: []scanner.FileInfo{
-			{Path: "a.jpg", Size: 100, Modified: now, Created: now},
-			{Path: "b.jpg", Size: 200, Modified: now, Created: now},
+			{Path: "a.jpg", Size: 100, Modified: now},
+			{Path: "b.jpg", Size: 200, Modified: now},
 		},
 		TotalFiles: 2,
 	}
@@ -246,7 +221,7 @@ func TestCompareScanFiles(t *testing.T) {
 		ScanDate: now,
 		RootPath: "/dst",
 		Files: []scanner.FileInfo{
-			{Path: "a.jpg", Size: 100, Modified: now, Created: now},
+			{Path: "a.jpg", Size: 100, Modified: now},
 		},
 		TotalFiles: 1,
 	}

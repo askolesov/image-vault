@@ -92,9 +92,6 @@ func filesModified(source, target scanner.FileInfo, opts CompareOptions) bool {
 	if !opts.SkipModifiedTime && !source.Modified.Equal(target.Modified) {
 		return true
 	}
-	if !opts.SkipCreatedTime && !source.Created.Equal(target.Created) {
-		return true
-	}
 	return false
 }
 

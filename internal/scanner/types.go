@@ -6,7 +6,6 @@ import "time"
 type FileInfo struct {
 	Path     string    `json:"path"`
 	Size     int64     `json:"size"`
-	Created  time.Time `json:"created"`
 	Modified time.Time `json:"modified"`
 	IsDir    bool      `json:"is_dir"`
 }
