@@ -3,7 +3,6 @@ package verifier
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"maps"
 	"os"
 	"path/filepath"
@@ -306,49 +305,20 @@ func (c *Cache) Close() error {
 	return closeErr
 }
 
-// renameOverwrite atomically replaces dst with src when the filesystem
-// supports it (POSIX rename(2)). Falls back to an in-place copy when the
-// first rename fails — SMB/CIFS and several FUSE mounts return various
-// errnos (EEXIST, ENOTEMPTY, EACCES, or wrapped errors) rather than
-// overwriting. The fallback writes directly to dst via O_TRUNC so the
-// cache file never disappears — a previous fallback implementation that
-// did os.Remove(dst)+os.Rename(src, dst) would destroy the cache outright
-// if the second rename failed for any reason.
+// renameOverwrite renames src over dst. POSIX rename(2) overwrites on the
+// same filesystem, but SMB/CIFS and several FUSE mounts refuse to overwrite
+// with various errnos. On any rename failure, remove dst and retry. If the
+// retry fails the cache is lost — acceptable since this is a regenerable
+// cache, not durable state.
 func renameOverwrite(src, dst string) error {
-	renameErr := os.Rename(src, dst)
-	if renameErr == nil {
+	if err := os.Rename(src, dst); err == nil {
 		debugLog("rename: %q -> %q ok", src, dst)
 		return nil
+	} else {
+		debugLog("rename failed: %q -> %q: %v; retrying with remove", src, dst, err)
 	}
-	debugLog("rename failed: %q -> %q: %v; falling back to copy", src, dst, renameErr)
-
-	srcF, openErr := os.Open(src)
-	if openErr != nil {
-		return fmt.Errorf("rename failed (%v); fallback open src: %w", renameErr, openErr)
-	}
-	defer func() { _ = srcF.Close() }()
-
-	dstF, createErr := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
-	if createErr != nil {
-		return fmt.Errorf("rename failed (%v); fallback open dst: %w", renameErr, createErr)
-	}
-
-	n, copyErr := io.Copy(dstF, srcF)
-	if copyErr != nil {
-		_ = dstF.Close()
-		return fmt.Errorf("rename failed (%v); fallback copy after %d bytes: %w", renameErr, n, copyErr)
-	}
-	if syncErr := dstF.Sync(); syncErr != nil {
-		_ = dstF.Close()
-		return fmt.Errorf("rename failed (%v); fallback sync: %w", renameErr, syncErr)
-	}
-	if closeErr := dstF.Close(); closeErr != nil {
-		return fmt.Errorf("rename failed (%v); fallback close: %w", renameErr, closeErr)
-	}
-
-	debugLog("fallback copy: %q -> %q, %d bytes written", src, dst, n)
-	_ = os.Remove(src) // best-effort cleanup; tmp leaks are harmless
-	return nil
+	_ = os.Remove(dst)
+	return os.Rename(src, dst)
 }
 
 // debugLog writes a diagnostic line to stderr when IMV_DEBUG is set. Used
