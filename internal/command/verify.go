@@ -52,7 +52,10 @@ func newVerifyCmd() *cobra.Command {
 				NoCache:       noCache,
 			}
 
-			v := verifier.New(cfg, ext, logger)
+			v, err := verifier.New(cfg, ext, logger)
+			if err != nil {
+				return err
+			}
 			result, err := v.Verify()
 			if err != nil {
 				return err

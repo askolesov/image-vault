@@ -64,19 +64,20 @@ type Verifier struct {
 	currentCache *Cache
 }
 
-// New creates a new Verifier, initializing the hasher from cfg.HashAlgo
-// (falling back to the default algorithm if invalid).
-func New(cfg Config, ext MetadataExtractor, logger *logging.Logger) *Verifier {
+// New creates a new Verifier, initializing the hasher from cfg.HashAlgo.
+// Returns an error if cfg.HashAlgo is unsupported so callers can surface
+// the misconfiguration instead of silently substituting the default.
+func New(cfg Config, ext MetadataExtractor, logger *logging.Logger) (*Verifier, error) {
 	hasher, err := defaults.NewHasher(cfg.HashAlgo)
 	if err != nil {
-		hasher, _ = defaults.NewHasher(defaults.DefaultHashAlgorithm)
+		return nil, fmt.Errorf("verifier: %w", err)
 	}
 	return &Verifier{
 		cfg:    cfg,
 		ext:    ext,
 		logger: logger,
 		hasher: hasher,
-	}
+	}, nil
 }
 
 // Verify runs integrity checks on the library and returns the result.

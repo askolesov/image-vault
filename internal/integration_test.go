@@ -68,7 +68,8 @@ func TestEndToEnd_ImportThenVerify(t *testing.T) {
 		Move:          false,
 		DryRun:        false,
 	}
-	imp := importer.New(impCfg, ext, logger)
+	imp, err := importer.New(impCfg, ext, logger)
+	require.NoError(t, err)
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 
@@ -89,7 +90,8 @@ func TestEndToEnd_ImportThenVerify(t *testing.T) {
 		HashAlgo:      "md5",
 		FailFast:      true,
 	}
-	ver := verifier.New(verCfg, ext, logger)
+	ver, err := verifier.New(verCfg, ext, logger)
+	require.NoError(t, err)
 	vResult, err := ver.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 1, vResult.Verified, "verify should confirm 1 file")
@@ -126,25 +128,29 @@ func setupCachedLib(t *testing.T) (libDir string, ext *fakeExtractor, logger *lo
 	logger = logging.New(os.Stdout, os.Stderr, false)
 	ext = &fakeExtractor{}
 
-	imp := importer.New(importer.Config{
+	imp, err := importer.New(importer.Config{
 		LibraryPath:   libDir,
 		SeparateVideo: false,
 		HashAlgo:      "md5",
 		FailFast:      true,
 	}, ext, logger)
-	_, err := imp.ImportDir(srcDir)
+	require.NoError(t, err)
+	_, err = imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	return
 }
 
-func newVerifier(libDir string, ext *fakeExtractor, logger *logging.Logger, noCache bool) *verifier.Verifier {
-	return verifier.New(verifier.Config{
+func newVerifier(t *testing.T, libDir string, ext *fakeExtractor, logger *logging.Logger, noCache bool) *verifier.Verifier {
+	t.Helper()
+	v, err := verifier.New(verifier.Config{
 		LibraryPath:   libDir,
 		SeparateVideo: false,
 		HashAlgo:      "md5",
 		FailFast:      true,
 		NoCache:       noCache,
 	}, ext, logger)
+	require.NoError(t, err)
+	return v
 }
 
 // TestVerifyCache_SecondRunSkipsExtract: first verify populates cache,
@@ -153,7 +159,7 @@ func TestVerifyCache_SecondRunSkipsExtract(t *testing.T) {
 	libDir, ext, logger := setupCachedLib(t)
 
 	// First run: populates cache.
-	v := newVerifier(libDir, ext, logger, false)
+	v := newVerifier(t, libDir, ext, logger, false)
 	r1, err := v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 2, r1.Verified)
@@ -168,7 +174,7 @@ func TestVerifyCache_SecondRunSkipsExtract(t *testing.T) {
 
 	// Second run: everything should cache-hit.
 	ext.extractCalls.Store(0)
-	v2 := newVerifier(libDir, ext, logger, false)
+	v2 := newVerifier(t, libDir, ext, logger, false)
 	r2, err := v2.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 2, r2.Verified)
@@ -181,7 +187,7 @@ func TestVerifyCache_SecondRunSkipsExtract(t *testing.T) {
 func TestVerifyCache_MtimeMismatchCausesMiss(t *testing.T) {
 	libDir, ext, logger := setupCachedLib(t)
 
-	v := newVerifier(libDir, ext, logger, false)
+	v := newVerifier(t, libDir, ext, logger, false)
 	_, err := v.Verify()
 	require.NoError(t, err)
 
@@ -193,7 +199,7 @@ func TestVerifyCache_MtimeMismatchCausesMiss(t *testing.T) {
 	require.NoError(t, os.Chtimes(files[0], newMtime, newMtime))
 
 	ext.extractCalls.Store(0)
-	v2 := newVerifier(libDir, ext, logger, false)
+	v2 := newVerifier(t, libDir, ext, logger, false)
 	r, err := v2.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 2, r.Verified)
@@ -207,7 +213,7 @@ func TestVerifyCache_MtimeMismatchCausesMiss(t *testing.T) {
 func TestVerifyCache_DeletedFileCompactedOut(t *testing.T) {
 	libDir, ext, logger := setupCachedLib(t)
 
-	v := newVerifier(libDir, ext, logger, false)
+	v := newVerifier(t, libDir, ext, logger, false)
 	_, err := v.Verify()
 	require.NoError(t, err)
 
@@ -221,7 +227,7 @@ func TestVerifyCache_DeletedFileCompactedOut(t *testing.T) {
 	require.GreaterOrEqual(t, len(files), 1)
 	require.NoError(t, os.Remove(files[0]))
 
-	v2 := newVerifier(libDir, ext, logger, false)
+	v2 := newVerifier(t, libDir, ext, logger, false)
 	_, err = v2.Verify()
 	require.NoError(t, err)
 
@@ -235,7 +241,7 @@ func TestVerifyCache_DeletedFileCompactedOut(t *testing.T) {
 func TestVerifyCache_NoCacheFlag(t *testing.T) {
 	libDir, ext, logger := setupCachedLib(t)
 
-	v := newVerifier(libDir, ext, logger, true) // noCache=true
+	v := newVerifier(t, libDir, ext, logger, true) // noCache=true
 	r, err := v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 2, r.Verified)
@@ -252,7 +258,7 @@ func TestVerifyCache_HashAlgoSwitchInvalidates(t *testing.T) {
 	libDir, ext, logger := setupCachedLib(t)
 
 	// Populate cache with md5.
-	v := newVerifier(libDir, ext, logger, false)
+	v := newVerifier(t, libDir, ext, logger, false)
 	_, err := v.Verify()
 	require.NoError(t, err)
 
@@ -261,12 +267,13 @@ func TestVerifyCache_HashAlgoSwitchInvalidates(t *testing.T) {
 	// see inconsistencies (filename hash doesn't match). That's expected and
 	// orthogonal; what we check here is that no entries survive intersection.
 	ext.extractCalls.Store(0)
-	v2 := verifier.New(verifier.Config{
+	v2, err := verifier.New(verifier.Config{
 		LibraryPath:   libDir,
 		SeparateVideo: false,
 		HashAlgo:      "sha256",
 		FailFast:      false,
 	}, ext, logger)
+	require.NoError(t, err)
 	r, err := v2.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 0, r.CacheHits, "algo switch must invalidate all entries")
@@ -289,13 +296,14 @@ func TestVerifyCache_FixDoesNotWriteCache(t *testing.T) {
 	require.NoError(t, os.WriteFile(wrongPath, []byte("contents-to-fix"), 0o644))
 
 	// First run with Fix=true: moves the file, counts Fixed, should NOT add to cache.
-	v := verifier.New(verifier.Config{
+	v, err := verifier.New(verifier.Config{
 		LibraryPath:   libDir,
 		SeparateVideo: false,
 		HashAlgo:      "md5",
 		Fix:           true,
 		FailFast:      false,
 	}, ext, logger)
+	require.NoError(t, err)
 	r1, err := v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 1, r1.Fixed)
@@ -304,12 +312,13 @@ func TestVerifyCache_FixDoesNotWriteCache(t *testing.T) {
 	// Second run without Fix: file at new location should be re-verified from scratch
 	// (not a cache hit).
 	ext.extractCalls.Store(0)
-	v2 := verifier.New(verifier.Config{
+	v2, err := verifier.New(verifier.Config{
 		LibraryPath:   libDir,
 		SeparateVideo: false,
 		HashAlgo:      "md5",
 		FailFast:      true,
 	}, ext, logger)
+	require.NoError(t, err)
 	r2, err := v2.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 0, r2.CacheHits, "fixed file must not be in cache")
@@ -332,13 +341,14 @@ func TestVerifyCache_YearFilterIsolation(t *testing.T) {
 		// Import one file with a fake extractor that returns year=yd.
 		srcDir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(srcDir, "p.jpg"), []byte(content), 0o644))
-		imp := importer.New(importer.Config{
+		imp, err := importer.New(importer.Config{
 			LibraryPath:   libDir,
 			SeparateVideo: false,
 			HashAlgo:      "md5",
 			FailFast:      true,
 		}, &dateForcedExtractor{dt: yd, inner: ext}, logger)
-		_, err := imp.ImportDir(srcDir)
+		require.NoError(t, err)
+		_, err = imp.ImportDir(srcDir)
 		require.NoError(t, err)
 	}
 	setupYear(2023, "content-2023")
@@ -347,13 +357,14 @@ func TestVerifyCache_YearFilterIsolation(t *testing.T) {
 	ext := &dateForcedExtractor{dt: time.Date(2024, 8, 20, 18, 45, 3, 0, time.UTC), inner: &fakeExtractor{}}
 
 	// First: populate both years' caches.
-	v := verifier.New(verifier.Config{
+	v, err := verifier.New(verifier.Config{
 		LibraryPath:   libDir,
 		SeparateVideo: false,
 		HashAlgo:      "md5",
 		FailFast:      false,
 	}, ext, logger)
-	_, err := v.Verify()
+	require.NoError(t, err)
+	_, err = v.Verify()
 	require.NoError(t, err)
 
 	cache2023 := verifier.CacheFilePath(filepath.Join(libDir, "2023"))
@@ -363,13 +374,14 @@ func TestVerifyCache_YearFilterIsolation(t *testing.T) {
 
 	// Second: only verify 2024 — 2023 cache must be untouched.
 	time.Sleep(10 * time.Millisecond) // ensure mtime granularity
-	v2 := verifier.New(verifier.Config{
+	v2, err := verifier.New(verifier.Config{
 		LibraryPath:   libDir,
 		SeparateVideo: false,
 		HashAlgo:      "md5",
 		YearFilter:    "2024",
 		FailFast:      false,
 	}, ext, logger)
+	require.NoError(t, err)
 	_, err = v2.Verify()
 	require.NoError(t, err)
 
@@ -389,7 +401,7 @@ func TestVerifyCache_ImvDirDoesNotFlagAsInconsistent(t *testing.T) {
 	libDir, ext, logger := setupCachedLib(t)
 
 	// First verify creates .imv/ and populates the cache.
-	v := newVerifier(libDir, ext, logger, false)
+	v := newVerifier(t, libDir, ext, logger, false)
 	r, err := v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 0, r.Inconsistent, ".imv/ should be allowed at year level")
@@ -406,12 +418,13 @@ func TestVerifyCache_StrayCacheFileIgnored(t *testing.T) {
 
 	require.NoError(t, os.WriteFile(filepath.Join(libDir, "2024", "stray.cache"), []byte("x"), 0o644))
 
-	v := verifier.New(verifier.Config{
+	v, err := verifier.New(verifier.Config{
 		LibraryPath:   libDir,
 		SeparateVideo: false,
 		HashAlgo:      "md5",
 		FailFast:      false,
 	}, ext, logger)
+	require.NoError(t, err)
 	r, err := v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 0, r.Inconsistent, "*.cache files should be ignored")

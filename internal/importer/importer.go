@@ -58,19 +58,20 @@ type Importer struct {
 	hasher *defaults.Hasher
 }
 
-// New creates a new Importer, initializing the hasher from cfg.HashAlgo
-// (falling back to the default algorithm if invalid).
-func New(cfg Config, ext MetadataExtractor, logger *logging.Logger) *Importer {
+// New creates a new Importer, initializing the hasher from cfg.HashAlgo.
+// Returns an error if cfg.HashAlgo is unsupported so callers can surface
+// the misconfiguration instead of silently substituting the default.
+func New(cfg Config, ext MetadataExtractor, logger *logging.Logger) (*Importer, error) {
 	hasher, err := defaults.NewHasher(cfg.HashAlgo)
 	if err != nil {
-		hasher, _ = defaults.NewHasher(defaults.DefaultHashAlgorithm)
+		return nil, fmt.Errorf("importer: %w", err)
 	}
 	return &Importer{
 		cfg:    cfg,
 		ext:    ext,
 		logger: logger,
 		hasher: hasher,
-	}
+	}, nil
 }
 
 // ImportDir imports all files from sourceDir into the library.

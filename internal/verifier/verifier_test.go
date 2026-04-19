@@ -115,7 +115,7 @@ func TestVerifyConsistentLibrary(t *testing.T) {
 		HashAlgo:      "md5",
 	}
 
-	v := New(cfg, ext, newTestLogger())
+	v, err := New(cfg, ext, newTestLogger())
 	result, err := v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Verified)
@@ -130,7 +130,7 @@ func TestVerifyYearFilter(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2023", "sources", "bad-device"), 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources", "also-bad"), 0o755))
 
-	v := New(Config{
+	v, err := New(Config{
 		LibraryPath: libDir,
 		HashAlgo:    "md5",
 		YearFilter:  "2024",
@@ -198,7 +198,7 @@ func TestVerifyPathMismatch(t *testing.T) {
 		Fix:           false,
 	}
 
-	v := New(cfg, ext, newTestLogger())
+	v, err := New(cfg, ext, newTestLogger())
 	result, err := v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Inconsistent)
@@ -206,7 +206,7 @@ func TestVerifyPathMismatch(t *testing.T) {
 
 	// Now test with Fix=true — update extractor for the same wrongPath
 	cfg.Fix = true
-	v = New(cfg, ext, newTestLogger())
+	v, err = New(cfg, ext, newTestLogger())
 	result, err = v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Fixed)
@@ -279,7 +279,7 @@ func TestVerifyHashMismatch(t *testing.T) {
 		Fix:           false,
 	}
 
-	v := New(cfg, ext, newTestLogger())
+	v, err := New(cfg, ext, newTestLogger())
 	result, err := v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Inconsistent)
@@ -349,7 +349,7 @@ func TestVerifyHashMismatchFix(t *testing.T) {
 		Fix:           true,
 	}
 
-	v := New(cfg, ext, newTestLogger())
+	v, err := New(cfg, ext, newTestLogger())
 	result, err := v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Inconsistent)
@@ -376,7 +376,7 @@ func TestVerifyExtractError(t *testing.T) {
 		HashAlgo:    "md5",
 	}
 
-	v := New(cfg, &errExtractor{}, newTestLogger())
+	v, err := New(cfg, &errExtractor{}, newTestLogger())
 	result, err := v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Errors)
@@ -395,8 +395,9 @@ func TestVerifyExtractErrorFailFast(t *testing.T) {
 		FailFast:    true,
 	}
 
-	v := New(cfg, &errExtractor{}, newTestLogger())
-	_, err := v.Verify()
+	v, err := New(cfg, &errExtractor{}, newTestLogger())
+	require.NoError(t, err)
+	_, err = v.Verify()
 	assert.Error(t, err)
 }
 
@@ -414,7 +415,7 @@ func TestVerifySkipsIgnoredAndSidecarFiles(t *testing.T) {
 		HashAlgo:    "md5",
 	}
 
-	v := New(cfg, &fakeExtractor{}, newTestLogger())
+	v, err := New(cfg, &fakeExtractor{}, newTestLogger())
 	result, err := v.Verify()
 	require.NoError(t, err)
 	// Both should be skipped, no errors or inconsistencies
@@ -473,7 +474,7 @@ func TestVerifySourceFileWithBadFilename(t *testing.T) {
 		HashAlgo:    "md5",
 	}
 
-	v := New(cfg, ext, newTestLogger())
+	v, err := New(cfg, ext, newTestLogger())
 	result, err := v.Verify()
 	require.NoError(t, err)
 	// This will be caught as path mismatch (since the file is at wrong path)
@@ -531,7 +532,7 @@ func TestVerifyPathMismatchFixDedupes(t *testing.T) {
 		Fix:           true,
 	}
 
-	v := New(cfg, ext, newTestLogger())
+	v, err := New(cfg, ext, newTestLogger())
 	result, err := v.Verify()
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.Errors, "hasher should be wired; no compare error")
@@ -604,7 +605,7 @@ func TestVerifyPathMismatchFixError(t *testing.T) {
 		Fix:           true,
 	}
 
-	v := New(cfg, ext, newTestLogger())
+	v, err := New(cfg, ext, newTestLogger())
 	result, err := v.Verify()
 	require.NoError(t, err)
 	// The file at wrongPath is a path mismatch; fix attempts move.
@@ -613,16 +614,17 @@ func TestVerifyPathMismatchFixError(t *testing.T) {
 	assert.Greater(t, result.Inconsistent+result.Fixed+result.Verified, 0)
 }
 
-// TestNewVerifierInvalidHashAlgo: falls back to default hash algorithm
+// TestNewVerifierInvalidHashAlgo: invalid algo surfaces as an error
+// (no silent fallback to the default).
 func TestNewVerifierInvalidHashAlgo(t *testing.T) {
 	cfg := Config{
 		LibraryPath: t.TempDir(),
 		HashAlgo:    "invalid-algo",
 	}
 
-	v := New(cfg, &fakeExtractor{}, newTestLogger())
-	require.NotNil(t, v)
-	require.NotNil(t, v.hasher)
+	v, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.Error(t, err)
+	assert.Nil(t, v)
 }
 
 func TestVerifyFastMode(t *testing.T) {
@@ -644,7 +646,7 @@ func TestVerifyFastMode(t *testing.T) {
 	path := filepath.Join("2024", "sources", "TestMake TestModel (image)", "2024-01-15", filename)
 	createTestFile(t, filepath.Join(libDir, path), content)
 
-	v := New(Config{
+	v, err := New(Config{
 		LibraryPath:   libDir,
 		SeparateVideo: true,
 		HashAlgo:      "md5",
@@ -665,7 +667,7 @@ func TestVerifyFastModeInvalidFilename(t *testing.T) {
 	path := filepath.Join("2024", "sources", "TestMake TestModel (image)", "2024-01-15", "bad-name.jpg")
 	createTestFile(t, filepath.Join(libDir, path), "data")
 
-	v := New(Config{
+	v, err := New(Config{
 		LibraryPath:   libDir,
 		SeparateVideo: true,
 		HashAlgo:      "md5",
@@ -687,7 +689,7 @@ func TestVerifyFastModeSkipsHashCheck(t *testing.T) {
 	path := filepath.Join("2024", "sources", "TestMake TestModel (image)", "2024-01-15", filename)
 	createTestFile(t, filepath.Join(libDir, path), "content that does not match deadbeef hash")
 
-	v := New(Config{
+	v, err := New(Config{
 		LibraryPath:   libDir,
 		SeparateVideo: true,
 		HashAlgo:      "md5",
@@ -708,7 +710,7 @@ func TestVerifyLibraryRootUnexpectedFile(t *testing.T) {
 	createTestFile(t, filepath.Join(libDir, "stray-file.txt"), "data")
 	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -719,7 +721,7 @@ func TestVerifyLibraryRootUnexpectedDir(t *testing.T) {
 	libDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "not-a-year"), 0o755))
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -732,7 +734,7 @@ func TestVerifyYearLevelUnexpectedEntries(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "random-dir"), 0o755))
 	createTestFile(t, filepath.Join(libDir, "2024", "stray.txt"), "data")
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -744,7 +746,7 @@ func TestVerifySourcesUnexpectedFile(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
 	createTestFile(t, filepath.Join(libDir, "2024", "sources", "stray.txt"), "data")
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -756,7 +758,7 @@ func TestVerifySourcesInvalidDeviceDir(t *testing.T) {
 	libDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources", "bad-device-name"), 0o755))
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -769,7 +771,7 @@ func TestVerifyDeviceDirUnexpectedFile(t *testing.T) {
 	require.NoError(t, os.MkdirAll(deviceDir, 0o755))
 	createTestFile(t, filepath.Join(deviceDir, "stray.txt"), "data")
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -782,7 +784,7 @@ func TestVerifyDeviceDirInvalidDateDir(t *testing.T) {
 	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)")
 	require.NoError(t, os.MkdirAll(filepath.Join(deviceDir, "not-a-date"), 0o755))
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -803,7 +805,7 @@ func TestVerifyCleanLibraryNoInconsistencies(t *testing.T) {
 	createTestFile(t, filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", filename), content)
 	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "processed", "2024-01-15 Birthday"), 0o755))
 
-	v := New(Config{LibraryPath: libDir, SeparateVideo: true, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, SeparateVideo: true, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -818,7 +820,7 @@ func TestVerifyIgnoredFilesSkippedAtAllLevels(t *testing.T) {
 	createTestFile(t, filepath.Join(libDir, "2024", ".DS_Store"), "")
 	createTestFile(t, filepath.Join(libDir, "2024", "sources", ".DS_Store"), "")
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -831,7 +833,7 @@ func TestVerifySourcesManualAllowed(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources-manual", "phone"), 0o755))
 	createTestFile(t, filepath.Join(libDir, "2024", "sources-manual", "phone", "old-photo.jpg"), "data")
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -845,7 +847,7 @@ func TestVerifyProcessedFreeform(t *testing.T) {
 	createTestFile(t, filepath.Join(libDir, "2024", "processed", "loose-file.txt"), "data")
 	createTestFile(t, filepath.Join(libDir, "2024", "processed", "any-name-is-fine", "edited.jpg"), "data")
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -857,7 +859,7 @@ func TestVerifyDateDirYearMismatch(t *testing.T) {
 	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)")
 	createTestFile(t, filepath.Join(deviceDir, "2023-06-15", "2023-06-15_12-00-00_abcd1234.jpg"), "data")
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -869,7 +871,7 @@ func TestVerifyFilenameDateMismatchDateDir(t *testing.T) {
 	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)")
 	createTestFile(t, filepath.Join(deviceDir, "2024-08-20", "2024-08-21_12-00-00_abcd1234.jpg"), "data")
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -881,7 +883,7 @@ func TestVerifyDateDirYearMismatchFastMode(t *testing.T) {
 	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)")
 	createTestFile(t, filepath.Join(deviceDir, "2023-06-15", "2023-06-15_12-00-00_abcd1234.jpg"), "data")
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false, Fast: true}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false, Fast: true}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)
@@ -893,7 +895,7 @@ func TestVerifyFilenameDateMismatchFastMode(t *testing.T) {
 	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)")
 	createTestFile(t, filepath.Join(deviceDir, "2024-08-20", "2024-08-21_12-00-00_abcd1234.jpg"), "data")
 
-	v := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false, Fast: true}, &fakeExtractor{}, newTestLogger())
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false, Fast: true}, &fakeExtractor{}, newTestLogger())
 
 	result, err := v.Verify()
 	require.NoError(t, err)

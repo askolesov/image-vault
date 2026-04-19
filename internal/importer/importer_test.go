@@ -69,7 +69,7 @@ func TestImportSingleFile(t *testing.T) {
 		DryRun:        false,
 	}
 
-	imp := New(cfg, &fakeExtractor{}, newTestLogger())
+	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 
@@ -93,7 +93,7 @@ func TestImportSkipsDuplicate(t *testing.T) {
 		HashAlgo:    "md5",
 	}
 
-	imp := New(cfg, &fakeExtractor{}, newTestLogger())
+	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
 
 	// First import
 	result1, err := imp.ImportDir(srcDir)
@@ -135,7 +135,7 @@ func TestImportDropsNonMedia(t *testing.T) {
 		KeepAll:     false,
 	}
 
-	imp := New(cfg, ext, newTestLogger())
+	imp, err := New(cfg, ext, newTestLogger())
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Dropped)
@@ -170,7 +170,7 @@ func TestImportKeepAll(t *testing.T) {
 		KeepAll:     true,
 	}
 
-	imp := New(cfg, ext, newTestLogger())
+	imp, err := New(cfg, ext, newTestLogger())
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Imported)
@@ -188,7 +188,7 @@ func TestImportSkipsIgnoredFiles(t *testing.T) {
 		HashAlgo:    "md5",
 	}
 
-	imp := New(cfg, &fakeExtractor{}, newTestLogger())
+	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.Imported)
@@ -207,7 +207,7 @@ func TestImportWithSidecars(t *testing.T) {
 		HashAlgo:    "md5",
 	}
 
-	imp := New(cfg, &fakeExtractor{}, newTestLogger())
+	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Imported)
@@ -230,7 +230,7 @@ func TestImportMoveMode(t *testing.T) {
 		Move:        true,
 	}
 
-	imp := New(cfg, &fakeExtractor{}, newTestLogger())
+	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Imported)
@@ -252,7 +252,7 @@ func TestImportDryRun(t *testing.T) {
 		DryRun:      true,
 	}
 
-	imp := New(cfg, &fakeExtractor{}, newTestLogger())
+	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Imported)
@@ -308,7 +308,7 @@ func TestImportYearFilter(t *testing.T) {
 		YearFilter:  "2025",
 	}
 
-	imp := New(cfg, ext, newTestLogger())
+	imp, err := New(cfg, ext, newTestLogger())
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Imported)
@@ -348,7 +348,7 @@ func TestImportExtractError(t *testing.T) {
 		FailFast:    false,
 	}
 
-	imp := New(cfg, &errExtractor{}, newTestLogger())
+	imp, err := New(cfg, &errExtractor{}, newTestLogger())
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Errors)
@@ -366,8 +366,9 @@ func TestImportExtractErrorFailFast(t *testing.T) {
 		FailFast:    true,
 	}
 
-	imp := New(cfg, &errExtractor{}, newTestLogger())
-	_, err := imp.ImportDir(srcDir)
+	imp, err := New(cfg, &errExtractor{}, newTestLogger())
+	require.NoError(t, err)
+	_, err = imp.ImportDir(srcDir)
 	assert.Error(t, err)
 }
 
@@ -377,8 +378,9 @@ func TestImportNonexistentSourceDir(t *testing.T) {
 		HashAlgo:    "md5",
 	}
 
-	imp := New(cfg, &fakeExtractor{}, newTestLogger())
-	_, err := imp.ImportDir("/nonexistent/source/dir")
+	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
+	_, err = imp.ImportDir("/nonexistent/source/dir")
 	assert.Error(t, err)
 }
 
@@ -388,9 +390,9 @@ func TestNewImporterInvalidHashAlgo(t *testing.T) {
 		HashAlgo:    "invalid-algo",
 	}
 
-	imp := New(cfg, &fakeExtractor{}, newTestLogger())
-	require.NotNil(t, imp)
-	require.NotNil(t, imp.hasher)
+	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.Error(t, err, "invalid hash algo should now surface as an error")
+	assert.Nil(t, imp)
 }
 
 func TestLinkSidecarsOrphan(t *testing.T) {
