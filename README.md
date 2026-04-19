@@ -91,7 +91,10 @@ imv verify [flags]
 | `--year YYYY` | Only verify files from this year |
 | `--no-fail-fast` | Continue on errors |
 | `--no-randomize` | Verify in directory order |
+| `--no-cache` | Skip the per-year verification cache (don't read or write it) |
 | `--hash-algo` | `md5` (default) or `sha256` |
+
+Verify keeps a per-year cache at `<year>/.imv/verify.cache` so repeated runs can skip files whose size and mtime are unchanged since the last successful verification. The cache survives crashes and power loss (appends are fsynced every 10 s; compaction is atomic). It is invalidated when files are copied without preserving mtime — use `rsync -a` or `cp -p` when migrating a library. To force a full re-verify of a year, delete its cache file or pass `--no-cache`.
 
 ### tools
 

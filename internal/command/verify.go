@@ -18,6 +18,7 @@ func newVerifyCmd() *cobra.Command {
 		year        string
 		noFailFast  bool
 		noRandomize bool
+		noCache     bool
 		hashAlgo    string
 	)
 
@@ -48,6 +49,7 @@ func newVerifyCmd() *cobra.Command {
 				Fast:          fast,
 				Randomize:     !noRandomize,
 				YearFilter:    year,
+				NoCache:       noCache,
 			}
 
 			v := verifier.New(cfg, ext, logger)
@@ -58,6 +60,7 @@ func newVerifyCmd() *cobra.Command {
 
 			logger.PrintSummary([]logging.SummaryField{
 				{Label: "Verified", Value: logging.FormatNumber(result.Verified)},
+				{Label: "Cache hits", Value: logging.FormatNumber(result.CacheHits)},
 				{Label: "Inconsistent", Value: logging.FormatNumber(result.Inconsistent)},
 				{Label: "Fixed", Value: logging.FormatNumber(result.Fixed)},
 				{Label: "Errors", Value: logging.FormatNumber(result.Errors)},
@@ -77,6 +80,7 @@ func newVerifyCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&noFailFast, "no-fail-fast", false, "Continue on errors instead of stopping")
 	cmd.Flags().BoolVar(&fast, "fast", false, "Fast mode: validate filenames and structure only, skip hash verification")
 	cmd.Flags().BoolVar(&noRandomize, "no-randomize", false, "Verify files in directory order instead of randomized")
+	cmd.Flags().BoolVar(&noCache, "no-cache", false, "Disable the verification cache for this run (don't read or write .imv/verify.cache)")
 	cmd.Flags().StringVar(&hashAlgo, "hash-algo", defaults.DefaultHashAlgorithm, "Hash algorithm to use (md5, sha256)")
 
 	return cmd
