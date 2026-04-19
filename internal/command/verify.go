@@ -1,6 +1,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -57,7 +58,8 @@ func newVerifyCmd() *cobra.Command {
 				return err
 			}
 			result, err := v.Verify()
-			if err != nil {
+			interrupted := errors.Is(err, verifier.ErrInterrupted)
+			if err != nil && !interrupted {
 				return err
 			}
 
@@ -69,6 +71,10 @@ func newVerifyCmd() *cobra.Command {
 				{Label: "Errors", Value: logging.FormatNumber(result.Errors)},
 				{Label: "Processed", Value: logging.FormatBytes(result.ProcessedBytes)},
 			})
+
+			if interrupted {
+				os.Exit(130)
+			}
 
 			if result.Inconsistent > 0 && !fix {
 				return fmt.Errorf("found %d inconsistencies (run with --fix to repair)", result.Inconsistent)

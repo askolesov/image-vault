@@ -1,6 +1,8 @@
 package verifier
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -17,6 +19,10 @@ import (
 	"github.com/askolesov/image-vault/internal/pathbuilder"
 	"github.com/askolesov/image-vault/internal/transfer"
 )
+
+// ErrInterrupted is returned by Verify when SIGINT/SIGTERM arrived
+// mid-run. Callers (cmd layer) translate it to exit code 130.
+var ErrInterrupted = errors.New("verify interrupted")
 
 // MetadataExtractor extracts metadata from a file.
 type MetadataExtractor interface {
@@ -81,26 +87,21 @@ func New(cfg Config, ext MetadataExtractor, logger *logging.Logger) (*Verifier, 
 }
 
 // Verify runs integrity checks on the library and returns the result.
+//
+// SIGINT/SIGTERM during the run flushes and closes the active per-year
+// cache so in-progress entries land on disk, then returns ErrInterrupted.
+// The command layer maps that to exit 130. Keeping os.Exit out of the
+// library means Verify is safe to call from tests and library consumers.
 func (v *Verifier) Verify() (*Result, error) {
-	// Signal handler: on SIGINT/SIGTERM, flush+close the currently-open cache
-	// before letting the process exit. Ensures in-progress verified entries
-	// land on disk even on user-interrupt.
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	doneCh := make(chan struct{})
-	defer func() {
-		signal.Stop(sigCh)
-		close(doneCh)
-	}()
-	go func() {
-		select {
-		case <-sigCh:
-			v.closeCurrentCache()
-			os.Exit(130)
-		case <-doneCh:
-			return
-		}
-	}()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return v.verifyWithContext(ctx)
+}
+
+func (v *Verifier) verifyWithContext(ctx context.Context) (*Result, error) {
+	// When the context is cancelled (signal or parent-cancel), close the
+	// active cache so the last flush happens before we return.
+	context.AfterFunc(ctx, v.closeCurrentCache)
 
 	years, err := library.ListYearsFiltered(v.cfg.LibraryPath, v.cfg.YearFilter)
 	if err != nil {
@@ -117,6 +118,10 @@ func (v *Verifier) Verify() (*Result, error) {
 	}
 
 	for i, year := range years {
+		if ctx.Err() != nil {
+			return result, ErrInterrupted
+		}
+
 		yearDir := filepath.Join(v.cfg.LibraryPath, year)
 
 		// Validate year level — only sources/, processed/, sources-manual/, .imv/ allowed
@@ -139,7 +144,7 @@ func (v *Verifier) Verify() (*Result, error) {
 		yc := v.openYearCache(yearDir, year, entries)
 		v.setCurrentCache(yc)
 
-		err = v.verifySourceFiles(year, entries, yc, i+1, len(years), result)
+		err = v.verifySourceFiles(ctx, year, entries, yc, i+1, len(years), result)
 		_ = yc.Close()
 		v.setCurrentCache(nil)
 		if err != nil {
@@ -147,6 +152,9 @@ func (v *Verifier) Verify() (*Result, error) {
 		}
 	}
 
+	if ctx.Err() != nil {
+		return result, ErrInterrupted
+	}
 	return result, nil
 }
 
@@ -223,6 +231,7 @@ func (v *Verifier) closeCurrentCache() {
 // verifySourceFiles checks each file in sources/ for correct path and hash.
 // Consumes pre-walked entries; no internal walk or stat.
 func (v *Verifier) verifySourceFiles(
+	ctx context.Context,
 	year string,
 	entries []FileEntry,
 	yc *Cache,
@@ -237,6 +246,9 @@ func (v *Verifier) verifySourceFiles(
 
 	total := len(entries)
 	for i, fe := range entries {
+		if ctx.Err() != nil {
+			return ErrInterrupted
+		}
 		filePath := fe.AbsPath
 		prefix := fmt.Sprintf("[%s %d/%d] ", year, yearIdx, yearTotal)
 		stats := fmt.Sprintf("valid:%d cached:%d fixed:%d inconsistent:%d %s",
