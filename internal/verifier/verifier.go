@@ -77,10 +77,10 @@ func New(cfg Config, ext MetadataExtractor, logger *logging.Logger) (*Verifier, 
 // Verify runs integrity checks on the library and returns the result.
 //
 // No signal handling: a SIGINT terminates the process via Go's default
-// handler. The cache is flushed every ~cacheFlushInterval during normal
-// operation, so a crash loses at most that window of AppendVerified
-// entries. Anything un-flushed is regenerated on the next run — this is
-// a verification cache, not durable state.
+// handler. The cache is persisted every ~persistInterval during normal
+// operation plus once at end of year, so a crash loses at most that
+// window of recorded entries. Anything un-persisted is regenerated on
+// the next run — this is a verification cache, not durable state.
 func (v *Verifier) Verify() (*Result, error) {
 	years, err := library.ListYearsFiltered(v.cfg.LibraryPath, v.cfg.YearFilter)
 	if err != nil {
@@ -119,7 +119,15 @@ func (v *Verifier) Verify() (*Result, error) {
 		yc := v.openYearCache(yearDir, year, entries)
 
 		err = v.verifySourceFiles(year, entries, yc, i+1, len(years), result)
-		_ = yc.Close()
+		// End-of-year persist: runs on success and error paths alike, matching
+		// the old Close() semantics. Best-effort; failure is logged but does
+		// not fail Verify. openYearCache already did the initial persist, so
+		// this is a no-op if no new entries were recorded.
+		if yc != nil && yc.dirty {
+			if perr := yc.Persist(); perr != nil {
+				v.logger.Warn("cache for %s: end-of-year persist failed: %v", year, perr)
+			}
+		}
 		if err != nil {
 			return result, err
 		}
@@ -181,8 +189,10 @@ func (v *Verifier) openYearCache(yearDir, year string, entries []FileEntry) *Cac
 		keep[fe.RelToYear] = existing
 	}
 
-	if err := c.Compact(keep); err != nil {
-		v.logger.Warn("cache for %s: compact failed: %v (continuing without cache)", year, err)
+	c.entries = keep
+	c.dirty = true
+	if err := c.Persist(); err != nil {
+		v.logger.Warn("cache for %s: initial persist failed: %v (continuing without cache)", year, err)
 		return nil
 	}
 	return c
@@ -317,8 +327,8 @@ func (v *Verifier) verifySourceFiles(
 			// Path matches — hash is correct by definition since the expected
 			// path is built from the content hash
 			result.Verified++
-			if err := yc.AppendVerified(NewEntry(fe.RelToYear, fe.Info, v.cfg.HashAlgo)); err != nil {
-				v.logger.Warn("cache append failed for %s: %v", filePath, err)
+			if err := yc.Record(NewEntry(fe.RelToYear, fe.Info, v.cfg.HashAlgo)); err != nil {
+				v.logger.Warn("cache record failed for %s: %v", filePath, err)
 			}
 		} else {
 			// Path mismatch (wrong dir, wrong hash in filename, etc.)
