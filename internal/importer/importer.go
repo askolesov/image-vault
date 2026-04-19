@@ -97,10 +97,6 @@ func (imp *Importer) ImportDir(sourceDir string) (*Result, error) {
 			result.Imported, result.Skipped, result.Dropped, logging.FormatBytes(result.ProcessedBytes))
 		imp.logger.ProgressWithStats(i+1, total, "", stats, g.Path)
 
-		if info, err := os.Stat(g.Path); err == nil {
-			result.ProcessedBytes += info.Size()
-		}
-
 		if err := imp.importFile(g, result); err != nil {
 			result.Errors++
 			imp.logger.Error("import %s: %v", g.Path, err)
@@ -148,19 +144,30 @@ func (imp *Importer) importFile(g fileWithSidecars, result *Result) error {
 		SkipCompare: imp.cfg.SkipCompare,
 	}
 
+	// Stat before transfer — if --move succeeds the source file is gone.
+	var sourceSize int64
+	if info, statErr := os.Stat(g.Path); statErr == nil {
+		sourceSize = info.Size()
+	}
+
 	action, err := transfer.TransferFile(g.Path, destPath, tOpts)
 	if err != nil {
 		return fmt.Errorf("transfer file: %w", err)
 	}
 
-	// Map action to result counts
+	// Map action to result counts. ProcessedBytes counts only bytes that
+	// actually moved to (or would move to) the library — skipped dupes
+	// and non-media drops are excluded, so the number matches what users
+	// expect from a "Processed" label.
 	switch action {
 	case transfer.ActionCopied, transfer.ActionMoved, transfer.ActionWouldCopy, transfer.ActionWouldMove:
 		result.Imported++
-	case transfer.ActionSkipped:
-		result.Skipped++
+		result.ProcessedBytes += sourceSize
 	case transfer.ActionReplaced, transfer.ActionWouldReplace:
 		result.Replaced++
+		result.ProcessedBytes += sourceSize
+	case transfer.ActionSkipped:
+		result.Skipped++
 	}
 
 	// Transfer sidecars
