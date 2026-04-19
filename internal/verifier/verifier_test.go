@@ -480,6 +480,70 @@ func TestVerifySourceFileWithBadFilename(t *testing.T) {
 	assert.Equal(t, 1, result.Inconsistent)
 }
 
+// TestVerifyPathMismatchFixDedupes: when --fix targets a path that already
+// exists with identical content, TransferFile needs a hasher to confirm
+// they match and then remove the duplicate source. Without NewHash, the
+// call would fail with "hasher is required for file comparison".
+func TestVerifyPathMismatchFixDedupes(t *testing.T) {
+	libDir := t.TempDir()
+
+	content := "jpeg-dedupe-fix"
+	hasher := mustHasher("md5")
+
+	tmpFile := filepath.Join(t.TempDir(), "tmp.jpg")
+	createTestFile(t, tmpFile, content)
+	full, short, err := metadata.ComputeFileHash(tmpFile, hasher)
+	require.NoError(t, err)
+
+	dt := time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+	md := &metadata.FileMetadata{
+		Extension: ".jpg",
+		Make:      "TestMake",
+		Model:     "TestModel",
+		DateTime:  dt,
+		MIMEType:  "image/jpeg",
+		MediaType: defaults.MediaTypePhoto,
+		FullHash:  full,
+		ShortHash: short,
+	}
+	relPath := pathbuilder.BuildSourcePath(md, pathbuilder.Options{SeparateVideo: false})
+	expectedPath := filepath.Join(libDir, relPath)
+
+	// Identical content at the correct path already.
+	createTestFile(t, expectedPath, content)
+
+	// Duplicate at the wrong path.
+	wrongPath := filepath.Join(libDir, "2024", "sources", "WrongDevice (image)", "2024-01-15",
+		pathbuilder.BuildSourceFilename(dt, short, ".jpg"))
+	createTestFile(t, wrongPath, content)
+
+	ext := &fakeExtractor{
+		results: map[string]*metadata.FileMetadata{
+			wrongPath:    md,
+			expectedPath: md,
+		},
+	}
+
+	cfg := Config{
+		LibraryPath:   libDir,
+		SeparateVideo: false,
+		HashAlgo:      "md5",
+		Fix:           true,
+	}
+
+	v := New(cfg, ext, newTestLogger())
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.Errors, "hasher should be wired; no compare error")
+	assert.Equal(t, 1, result.Fixed, "duplicate source should be moved away")
+
+	// Wrong path should be gone; expected path still there.
+	_, err = os.Stat(wrongPath)
+	assert.True(t, os.IsNotExist(err), "duplicate at wrong path should be removed")
+	_, err = os.Stat(expectedPath)
+	assert.NoError(t, err)
+}
+
 // TestVerifyPathMismatchFixError: fix move fails → Errors++
 func TestVerifyPathMismatchFixError(t *testing.T) {
 	libDir := t.TempDir()

@@ -353,7 +353,10 @@ func (v *Verifier) verifySourceFiles(
 			result.Inconsistent++
 			v.logger.Warn("path mismatch: %s should be at %s", absActual, absExpected)
 			if v.cfg.Fix {
-				if _, err := transfer.TransferFile(filePath, expectedPath, transfer.Options{Move: true}); err != nil {
+				if _, err := transfer.TransferFile(filePath, expectedPath, transfer.Options{
+					Move:    true,
+					NewHash: v.hasher.New,
+				}); err != nil {
 					result.Errors++
 					v.logger.Error("fix move %s → %s: %v", filePath, expectedPath, err)
 				} else {
