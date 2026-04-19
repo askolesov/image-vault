@@ -303,11 +303,9 @@ func TestCacheConcurrentAppendAndClose(t *testing.T) {
 	require.NoError(t, c.Compact(map[string]Entry{}))
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		// Hammer appends until Close is called and sets file=nil.
-		for i := 0; i < 10_000; i++ {
+		for i := range 10_000 {
 			_ = c.AppendVerified(Entry{
 				RelPath:    "sources/Dev (image)/2024-01-15/a.jpg",
 				Size:       1,
@@ -316,7 +314,7 @@ func TestCacheConcurrentAppendAndClose(t *testing.T) {
 				VerifiedAt: time.Now().Unix(),
 			})
 		}
-	}()
+	})
 
 	// Small sleep to let appends start, then close concurrently.
 	time.Sleep(1 * time.Millisecond)
