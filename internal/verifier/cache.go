@@ -284,18 +284,23 @@ func (c *Cache) Close() error {
 }
 
 // renameOverwrite renames src to dst, falling back to remove + rename when
-// the filesystem refuses to overwrite an existing destination. POSIX
-// rename(2) overwrites, but some filesystems — notably SMB/CIFS shares and
-// several FUSE mounts — return EEXIST instead. The fallback is not atomic;
-// the brief window where dst is absent is acceptable for the cache, where
-// a missing file simply means "no hits" on the next reader.
+// the first rename fails. POSIX rename(2) overwrites, but SMB/CIFS shares
+// and several FUSE mounts refuse rename-over-existing with various errnos
+// (EEXIST, ENOTEMPTY, EACCES depending on the server) and wrapper layers
+// sometimes obscure the original errno. Rather than match specific errors,
+// we try the fallback on any rename failure — if the destination simply
+// doesn't exist we still fail with a meaningful error on the second rename.
+// The fallback is not atomic; the brief window where dst is absent is
+// acceptable for the cache, where a missing file simply means "no hits"
+// on the next reader.
 func renameOverwrite(src, dst string) error {
-	err := os.Rename(src, dst)
-	if err == nil || !errors.Is(err, fs.ErrExist) {
-		return err
+	if err := os.Rename(src, dst); err == nil {
+		return nil
 	}
-	if removeErr := os.Remove(dst); removeErr != nil {
-		return err
+	// Best-effort remove; ignore "not found" since that means rename failed
+	// for some other reason that removing dst won't help with.
+	if removeErr := os.Remove(dst); removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
+		return removeErr
 	}
 	return os.Rename(src, dst)
 }
