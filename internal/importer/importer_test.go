@@ -70,6 +70,7 @@ func TestImportSingleFile(t *testing.T) {
 	}
 
 	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 
@@ -94,6 +95,7 @@ func TestImportSkipsDuplicate(t *testing.T) {
 	}
 
 	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
 
 	// First import
 	result1, err := imp.ImportDir(srcDir)
@@ -136,6 +138,7 @@ func TestImportDropsNonMedia(t *testing.T) {
 	}
 
 	imp, err := New(cfg, ext, newTestLogger())
+	require.NoError(t, err)
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Dropped)
@@ -171,6 +174,7 @@ func TestImportKeepAll(t *testing.T) {
 	}
 
 	imp, err := New(cfg, ext, newTestLogger())
+	require.NoError(t, err)
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Imported)
@@ -189,6 +193,7 @@ func TestImportSkipsIgnoredFiles(t *testing.T) {
 	}
 
 	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.Imported)
@@ -208,6 +213,7 @@ func TestImportWithSidecars(t *testing.T) {
 	}
 
 	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Imported)
@@ -231,6 +237,7 @@ func TestImportMoveMode(t *testing.T) {
 	}
 
 	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Imported)
@@ -253,6 +260,7 @@ func TestImportDryRun(t *testing.T) {
 	}
 
 	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Imported)
@@ -309,6 +317,7 @@ func TestImportYearFilter(t *testing.T) {
 	}
 
 	imp, err := New(cfg, ext, newTestLogger())
+	require.NoError(t, err)
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Imported)
@@ -349,6 +358,7 @@ func TestImportExtractError(t *testing.T) {
 	}
 
 	imp, err := New(cfg, &errExtractor{}, newTestLogger())
+	require.NoError(t, err)
 	result, err := imp.ImportDir(srcDir)
 	require.NoError(t, err)
 	assert.Equal(t, 1, result.Errors)
