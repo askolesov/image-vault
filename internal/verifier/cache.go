@@ -137,12 +137,19 @@ func (c *Cache) Lookup(relPath string) (Entry, bool) {
 }
 
 // Matches reports whether e is still valid for the given FileInfo and algo.
+// Mtime is compared at whole-second precision: SMB/CIFS, NFSv3, FAT, and
+// several FUSE mounts quantize mtime to seconds, so a cache populated on
+// one host (native FS, nanosecond precision) and read on another (SMB,
+// second precision) against the same underlying file would otherwise
+// mismatch every entry. Second granularity is the common denominator
+// supported by every filesystem we care about.
 func (c *Cache) Matches(e Entry, fi os.FileInfo, algo string) bool {
 	if c == nil || fi == nil {
 		return false
 	}
+	const nsPerSec = int64(time.Second)
 	return e.Size == fi.Size() &&
-		e.MtimeNs == fi.ModTime().UnixNano() &&
+		e.MtimeNs/nsPerSec == fi.ModTime().Unix() &&
 		e.HashAlgo == algo
 }
 
