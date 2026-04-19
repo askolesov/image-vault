@@ -147,9 +147,46 @@ func TestCacheMatches(t *testing.T) {
 	eWrongSize.Size = e.Size + 1
 	assert.False(t, c.Matches(eWrongSize, fi, "md5"))
 
-	eWrongMtime := e
-	eWrongMtime.MtimeNs = e.MtimeNs + 1
-	assert.False(t, c.Matches(eWrongMtime, fi, "md5"))
+	// Mtime differences smaller than a second are tolerated — SMB/CIFS
+	// and several network filesystems quantize mtime to whole seconds, so
+	// ns-precision comparison would break cross-host cache sharing.
+	eSubSecond := e
+	eSubSecond.MtimeNs = e.MtimeNs - (e.MtimeNs % int64(time.Second))
+	assert.True(t, c.Matches(eSubSecond, fi, "md5"),
+		"sub-second mtime differences must not invalidate cache (cross-FS scenario)")
+
+	// But differences of a full second or more must still invalidate.
+	eWrongSecond := e
+	eWrongSecond.MtimeNs = e.MtimeNs + int64(time.Second)
+	assert.False(t, c.Matches(eWrongSecond, fi, "md5"),
+		"whole-second mtime drift should invalidate cache")
+}
+
+// TestCacheMatches_CrossHostSMBScenario reproduces the exact data observed
+// on a Mac SMB client reading a cache written by a Samba/Ubuntu server:
+// the cached mtime was truncated to whole seconds at write time, but the
+// same file read via the native ext4 path later reports nanosecond mtime.
+// Same file, same mtime at second granularity — must match.
+func TestCacheMatches_CrossHostSMBScenario(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "file")
+	require.NoError(t, os.WriteFile(filePath, []byte("content"), 0o644))
+	// Force a known mtime with non-zero nanosecond component.
+	full := time.Unix(1732532661, 869460100)
+	require.NoError(t, os.Chtimes(filePath, full, full))
+
+	fi, err := os.Stat(filePath)
+	require.NoError(t, err)
+
+	// Cache written on the other host at second precision.
+	e := Entry{
+		Size:     fi.Size(),
+		MtimeNs:  full.Unix() * int64(time.Second),
+		HashAlgo: "md5",
+	}
+	c := &Cache{}
+	assert.True(t, c.Matches(e, fi, "md5"),
+		"cache entry written at second precision should match ns-precision disk mtime")
 }
 
 func TestCacheCompact_HappyPath(t *testing.T) {

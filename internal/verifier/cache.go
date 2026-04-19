@@ -2,9 +2,7 @@ package verifier
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
-	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -91,15 +89,22 @@ func Load(path string) (*Cache, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
+			debugLog("load: %q missing; starting empty", path)
 			return c, nil
 		}
+		debugLog("load: open %q failed: %v", path, err)
 		return nil, fmt.Errorf("open cache: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
+	if fi, err := f.Stat(); err == nil {
+		debugLog("load: %q size=%d mtime=%s", path, fi.Size(), fi.ModTime().Format(time.RFC3339))
+	}
+
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 
+	var malformed int
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -107,14 +112,17 @@ func Load(path string) (*Cache, error) {
 		}
 		e, ok := parseCacheLine(line)
 		if !ok {
+			malformed++
 			continue
 		}
 		c.entries[e.RelPath] = e
 	}
 	if err := scanner.Err(); err != nil {
+		debugLog("load: scan error: %v", err)
 		return c, fmt.Errorf("scan cache: %w", err)
 	}
 
+	debugLog("load ok: %q entries=%d malformed=%d", path, len(c.entries), malformed)
 	return c, nil
 }
 
@@ -128,12 +136,19 @@ func (c *Cache) Lookup(relPath string) (Entry, bool) {
 }
 
 // Matches reports whether e is still valid for the given FileInfo and algo.
+// Mtime is compared at whole-second precision: SMB/CIFS, NFSv3, FAT, and
+// several FUSE mounts quantize mtime to seconds, so a cache populated on
+// one host (native FS, nanosecond precision) and read on another (SMB,
+// second precision) against the same underlying file would otherwise
+// mismatch every entry. Second granularity is the common denominator
+// supported by every filesystem we care about.
 func (c *Cache) Matches(e Entry, fi os.FileInfo, algo string) bool {
 	if c == nil || fi == nil {
 		return false
 	}
+	const nsPerSec = int64(time.Second)
 	return e.Size == fi.Size() &&
-		e.MtimeNs == fi.ModTime().UnixNano() &&
+		e.MtimeNs/nsPerSec == fi.ModTime().Unix() &&
 		e.HashAlgo == algo
 }
 
@@ -154,14 +169,17 @@ func (c *Cache) Compact(keep map[string]Entry) error {
 	if c == nil {
 		return nil
 	}
+	debugLog("compact start: path=%q keep=%d", c.path, len(keep))
 
 	if err := os.MkdirAll(filepath.Dir(c.path), 0o755); err != nil {
+		debugLog("compact: mkdir failed: %v", err)
 		return fmt.Errorf("mkdir cache dir: %w", err)
 	}
 
 	tmpPath := c.path + ".tmp"
 	tmp, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
+		debugLog("compact: open tmp %q failed: %v", tmpPath, err)
 		return fmt.Errorf("create tmp cache: %w", err)
 	}
 
@@ -192,8 +210,10 @@ func (c *Cache) Compact(keep map[string]Entry) error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("close tmp cache: %w", err)
 	}
+	debugLog("compact: tmp written ok at %q", tmpPath)
 
 	if err := renameOverwrite(tmpPath, c.path); err != nil {
+		debugLog("compact: renameOverwrite failed: %v", err)
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("rename cache: %w", err)
 	}
@@ -203,11 +223,13 @@ func (c *Cache) Compact(keep map[string]Entry) error {
 
 	f, err := os.OpenFile(c.path, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
+		debugLog("compact: reopen for append failed: %v", err)
 		return fmt.Errorf("reopen cache for append: %w", err)
 	}
 	c.file = f
 	c.buf = bufio.NewWriter(f)
 	c.lastFlush = time.Now()
+	debugLog("compact ok: path=%q entries=%d", c.path, len(c.entries))
 
 	return nil
 }
@@ -283,26 +305,30 @@ func (c *Cache) Close() error {
 	return closeErr
 }
 
-// renameOverwrite renames src to dst, falling back to remove + rename when
-// the first rename fails. POSIX rename(2) overwrites, but SMB/CIFS shares
-// and several FUSE mounts refuse rename-over-existing with various errnos
-// (EEXIST, ENOTEMPTY, EACCES depending on the server) and wrapper layers
-// sometimes obscure the original errno. Rather than match specific errors,
-// we try the fallback on any rename failure — if the destination simply
-// doesn't exist we still fail with a meaningful error on the second rename.
-// The fallback is not atomic; the brief window where dst is absent is
-// acceptable for the cache, where a missing file simply means "no hits"
-// on the next reader.
+// renameOverwrite renames src over dst. POSIX rename(2) overwrites on the
+// same filesystem, but SMB/CIFS and several FUSE mounts refuse to overwrite
+// with various errnos. On any rename failure, remove dst and retry. If the
+// retry fails the cache is lost — acceptable since this is a regenerable
+// cache, not durable state.
 func renameOverwrite(src, dst string) error {
 	if err := os.Rename(src, dst); err == nil {
+		debugLog("rename: %q -> %q ok", src, dst)
 		return nil
+	} else {
+		debugLog("rename failed: %q -> %q: %v; retrying with remove", src, dst, err)
 	}
-	// Best-effort remove; ignore "not found" since that means rename failed
-	// for some other reason that removing dst won't help with.
-	if removeErr := os.Remove(dst); removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
-		return removeErr
-	}
+	_ = os.Remove(dst)
 	return os.Rename(src, dst)
+}
+
+// debugLog writes a diagnostic line to stderr when IMV_DEBUG is set. Used
+// to trace cache-path decisions without polluting normal output. The test
+// suite leaves IMV_DEBUG unset, so output is silent during CI.
+func debugLog(format string, args ...any) {
+	if os.Getenv("IMV_DEBUG") == "" {
+		return
+	}
+	_, _ = fmt.Fprintf(os.Stderr, "[imv-debug] "+format+"\n", args...)
 }
 
 func writeCacheHeader(w *bufio.Writer) error {
