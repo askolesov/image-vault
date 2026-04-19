@@ -199,6 +199,8 @@ func fileHash(path string, newHash func() hash.Hash) (string, error) {
 }
 
 // copyFile copies source to target, creating parent directories as needed.
+// Data is fsync'd before close so an abrupt power loss cannot leave behind
+// a zero-byte file while reporting success.
 func copyFile(source, target string) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return fmt.Errorf("create target dir: %w", err)
@@ -214,11 +216,20 @@ func copyFile(source, target string) error {
 	if err != nil {
 		return fmt.Errorf("create target: %w", err)
 	}
-	defer func() { _ = dst.Close() }()
 
 	if _, err := io.Copy(dst, src); err != nil {
+		_ = dst.Close()
 		return fmt.Errorf("copy data: %w", err)
 	}
 
-	return dst.Close()
+	if err := dst.Sync(); err != nil {
+		_ = dst.Close()
+		return fmt.Errorf("sync target: %w", err)
+	}
+
+	if err := dst.Close(); err != nil {
+		return fmt.Errorf("close target: %w", err)
+	}
+
+	return nil
 }

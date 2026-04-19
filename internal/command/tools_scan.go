@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/askolesov/image-vault/internal/scanner"
 	"github.com/spf13/cobra"
@@ -20,7 +21,7 @@ func newToolsScanCmd() *cobra.Command {
 
 			progressCb := func(p scanner.ProgressInfo) {
 				_, _ = fmt.Fprintf(os.Stderr, "\rScanned %d files (%d bytes) — %s",
-					p.FilesScanned, p.TotalSize, p.ElapsedTime.Truncate(1))
+					p.FilesScanned, p.TotalSize, p.ElapsedTime.Truncate(time.Second))
 			}
 
 			result, err := s.ScanDirectory(args[0], progressCb)

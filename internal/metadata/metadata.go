@@ -41,6 +41,9 @@ func ComputeFileHash(path string, hasher *defaults.Hasher) (full string, short s
 	}
 
 	full = hex.EncodeToString(h.Sum(nil))
+	if hasher.ShortLen() > len(full) {
+		return "", "", fmt.Errorf("short length %d exceeds hash length %d", hasher.ShortLen(), len(full))
+	}
 	short = full[:hasher.ShortLen()]
 	return full, short, nil
 }

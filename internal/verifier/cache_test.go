@@ -4,7 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -286,6 +288,38 @@ func TestCacheClose_Idempotent(t *testing.T) {
 	require.NoError(t, c.Compact(map[string]Entry{}))
 	require.NoError(t, c.Close())
 	require.NoError(t, c.Close(), "second Close should be no-op")
+}
+
+// TestCacheConcurrentAppendAndClose models the SIGINT path: the main
+// goroutine calls AppendVerified in a tight loop while a second goroutine
+// (the signal handler) calls Close. Before the mutex was added, `go test
+// -race` would flag concurrent access to bufio.Writer and *os.File.
+func TestCacheConcurrentAppendAndClose(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".imv", "verify.cache")
+
+	c, err := Load(path)
+	require.NoError(t, err)
+	require.NoError(t, c.Compact(map[string]Entry{}))
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		// Hammer appends until Close is called and sets file=nil.
+		for i := range 10_000 {
+			_ = c.AppendVerified(Entry{
+				RelPath:    "sources/Dev (image)/2024-01-15/a.jpg",
+				Size:       1,
+				MtimeNs:    int64(i),
+				HashAlgo:   "md5",
+				VerifiedAt: time.Now().Unix(),
+			})
+		}
+	})
+
+	// Small sleep to let appends start, then close concurrently.
+	time.Sleep(1 * time.Millisecond)
+	assert.NoError(t, c.Close())
+	wg.Wait()
 }
 
 func TestCacheNilReceiver_AllMethodsNoOp(t *testing.T) {

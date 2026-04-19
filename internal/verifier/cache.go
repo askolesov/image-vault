@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/askolesov/image-vault/internal/defaults"
@@ -32,7 +33,11 @@ type Entry struct {
 
 // Cache holds per-year verification cache state.
 // A nil *Cache is a valid no-op receiver for every method.
+// The mutex guards concurrent access from a signal handler goroutine
+// (which may Close the cache on SIGINT) and the main verify goroutine
+// (which Appends and Flushes).
 type Cache struct {
+	mu        sync.Mutex
 	path      string
 	entries   map[string]Entry
 	file      *os.File
@@ -209,7 +214,12 @@ func (c *Cache) Compact(keep map[string]Entry) error {
 // are rejected (they would corrupt the TSV format). Flush + fsync if the
 // time since last flush exceeds cacheFlushInterval.
 func (c *Cache) AppendVerified(e Entry) error {
-	if c == nil || c.file == nil || c.buf == nil {
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.file == nil || c.buf == nil {
 		return nil
 	}
 	if strings.ContainsAny(e.RelPath, "\t\n") {
@@ -221,14 +231,24 @@ func (c *Cache) AppendVerified(e Entry) error {
 	c.entries[e.RelPath] = e
 
 	if time.Since(c.lastFlush) > cacheFlushInterval {
-		return c.Flush()
+		return c.flushLocked()
 	}
 	return nil
 }
 
 // Flush empties the buffer and fsyncs.
 func (c *Cache) Flush() error {
-	if c == nil || c.file == nil || c.buf == nil {
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.flushLocked()
+}
+
+// flushLocked performs the flush work; caller must hold c.mu.
+func (c *Cache) flushLocked() error {
+	if c.file == nil || c.buf == nil {
 		return nil
 	}
 	if err := c.buf.Flush(); err != nil {
@@ -243,10 +263,15 @@ func (c *Cache) Flush() error {
 
 // Close flushes and closes the cache file. Idempotent.
 func (c *Cache) Close() error {
-	if c == nil || c.file == nil {
+	if c == nil {
 		return nil
 	}
-	flushErr := c.Flush()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.file == nil {
+		return nil
+	}
+	flushErr := c.flushLocked()
 	closeErr := c.file.Close()
 	c.file = nil
 	c.buf = nil

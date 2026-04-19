@@ -56,33 +56,6 @@ func effectiveMediaType(mt defaults.MediaType, opts Options) defaults.MediaType 
 	return mt
 }
 
-var processedDirRegex = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}) (\S.*)$`)
-
-// ValidateProcessedDirName validates a processed directory name in "YYYY-MM-DD <event name>" format.
-func ValidateProcessedDirName(dirName string, expectedYear string) error {
-	if dirName == "" {
-		return fmt.Errorf("empty directory name")
-	}
-
-	matches := processedDirRegex.FindStringSubmatch(dirName)
-	if matches == nil {
-		return fmt.Errorf("directory name %q does not match expected format YYYY-MM-DD <event name>", dirName)
-	}
-
-	dateStr := matches[1]
-	_, err := time.Parse("2006-01-02", dateStr)
-	if err != nil {
-		return fmt.Errorf("invalid date %q: %w", dateStr, err)
-	}
-
-	year := dateStr[:4]
-	if year != expectedYear {
-		return fmt.Errorf("year %s does not match expected year %s", year, expectedYear)
-	}
-
-	return nil
-}
-
 var deviceDirRegex = regexp.MustCompile(`^.+ \((image|video|audio)\)$`)
 
 // ValidateDeviceDir checks that a directory name matches the "<Make> <Model> (<type>)" pattern.

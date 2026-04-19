@@ -61,7 +61,10 @@ func newImportCmd() *cobra.Command {
 				YearFilter:    year,
 			}
 
-			imp := importer.New(cfg, ext, logger)
+			imp, err := importer.New(cfg, ext, logger)
+			if err != nil {
+				return err
+			}
 			result, err := imp.ImportDir(sourcePath)
 			if err != nil {
 				return err

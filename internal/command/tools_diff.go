@@ -12,7 +12,6 @@ func newToolsDiffCmd() *cobra.Command {
 	var (
 		output       string
 		skipModified bool
-		skipCreated  bool
 	)
 
 	cmd := &cobra.Command{
@@ -26,7 +25,6 @@ func newToolsDiffCmd() *cobra.Command {
 			d := differ.NewDiffer()
 			opts := differ.CompareOptions{
 				SkipModifiedTime: skipModified,
-				SkipCreatedTime:  skipCreated,
 			}
 
 			report, err := d.CompareScanFiles(sourceFile, targetFile, opts)
@@ -53,7 +51,6 @@ func newToolsDiffCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&output, "output", "o", "", "output file path for the diff JSON")
 	cmd.Flags().BoolVar(&skipModified, "skip-modified", false, "ignore modification time differences")
-	cmd.Flags().BoolVar(&skipCreated, "skip-created", false, "ignore creation time differences")
 
 	return cmd
 }

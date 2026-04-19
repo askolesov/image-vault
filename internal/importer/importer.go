@@ -58,19 +58,20 @@ type Importer struct {
 	hasher *defaults.Hasher
 }
 
-// New creates a new Importer, initializing the hasher from cfg.HashAlgo
-// (falling back to the default algorithm if invalid).
-func New(cfg Config, ext MetadataExtractor, logger *logging.Logger) *Importer {
+// New creates a new Importer, initializing the hasher from cfg.HashAlgo.
+// Returns an error if cfg.HashAlgo is unsupported so callers can surface
+// the misconfiguration instead of silently substituting the default.
+func New(cfg Config, ext MetadataExtractor, logger *logging.Logger) (*Importer, error) {
 	hasher, err := defaults.NewHasher(cfg.HashAlgo)
 	if err != nil {
-		hasher, _ = defaults.NewHasher(defaults.DefaultHashAlgorithm)
+		return nil, fmt.Errorf("importer: %w", err)
 	}
 	return &Importer{
 		cfg:    cfg,
 		ext:    ext,
 		logger: logger,
 		hasher: hasher,
-	}
+	}, nil
 }
 
 // ImportDir imports all files from sourceDir into the library.
@@ -95,10 +96,6 @@ func (imp *Importer) ImportDir(sourceDir string) (*Result, error) {
 		stats := fmt.Sprintf("new:%d skipped:%d dropped:%d %s",
 			result.Imported, result.Skipped, result.Dropped, logging.FormatBytes(result.ProcessedBytes))
 		imp.logger.ProgressWithStats(i+1, total, "", stats, g.Path)
-
-		if info, err := os.Stat(g.Path); err == nil {
-			result.ProcessedBytes += info.Size()
-		}
 
 		if err := imp.importFile(g, result); err != nil {
 			result.Errors++
@@ -147,19 +144,30 @@ func (imp *Importer) importFile(g fileWithSidecars, result *Result) error {
 		SkipCompare: imp.cfg.SkipCompare,
 	}
 
+	// Stat before transfer — if --move succeeds the source file is gone.
+	var sourceSize int64
+	if info, statErr := os.Stat(g.Path); statErr == nil {
+		sourceSize = info.Size()
+	}
+
 	action, err := transfer.TransferFile(g.Path, destPath, tOpts)
 	if err != nil {
 		return fmt.Errorf("transfer file: %w", err)
 	}
 
-	// Map action to result counts
+	// Map action to result counts. ProcessedBytes counts only bytes that
+	// actually moved to (or would move to) the library — skipped dupes
+	// and non-media drops are excluded, so the number matches what users
+	// expect from a "Processed" label.
 	switch action {
 	case transfer.ActionCopied, transfer.ActionMoved, transfer.ActionWouldCopy, transfer.ActionWouldMove:
 		result.Imported++
-	case transfer.ActionSkipped:
-		result.Skipped++
+		result.ProcessedBytes += sourceSize
 	case transfer.ActionReplaced, transfer.ActionWouldReplace:
 		result.Replaced++
+		result.ProcessedBytes += sourceSize
+	case transfer.ActionSkipped:
+		result.Skipped++
 	}
 
 	// Transfer sidecars
