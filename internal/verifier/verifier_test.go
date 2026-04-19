@@ -221,6 +221,36 @@ func TestVerifyPathMismatch(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestVerifyPathMismatchFailFast: with FailFast=true and Fix=false, the first
+// path mismatch must abort Verify instead of continuing through the rest of
+// the library. Regression test for a bug where the path-mismatch branch was
+// the only inconsistency site that ignored v.cfg.FailFast.
+func TestVerifyPathMismatchFailFast(t *testing.T) {
+	libDir := t.TempDir()
+
+	// Two files at a wrong-but-structurally-valid device dir. Default
+	// fakeExtractor returns TestMake/TestModel metadata, so the expected
+	// path for each file lives under a different device dir — both are
+	// path mismatches.
+	wrongDir := filepath.Join(libDir, "2024", "sources", "OtherMake OtherModel (image)", "2024-01-15")
+	createTestFile(t, filepath.Join(wrongDir, "a.jpg"), "content-a")
+	createTestFile(t, filepath.Join(wrongDir, "b.jpg"), "content-b")
+
+	cfg := Config{
+		LibraryPath:   libDir,
+		SeparateVideo: false,
+		HashAlgo:      "md5",
+		FailFast:      true,
+		Randomize:     false,
+	}
+
+	v, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
+	result, err := v.Verify()
+	require.Error(t, err, "FailFast should surface an error on the first path mismatch")
+	assert.Equal(t, 1, result.Inconsistent, "FailFast should stop after the first inconsistency")
+}
+
 // TestVerifyHashMismatch: file at correct path but content changed so hash no longer matches filename
 func TestVerifyHashMismatch(t *testing.T) {
 	libDir := t.TempDir()
