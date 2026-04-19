@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
 
 	"github.com/askolesov/image-vault/internal/defaults"
 	"github.com/askolesov/image-vault/internal/library"
@@ -30,6 +33,7 @@ type Config struct {
 	Fast          bool
 	Randomize     bool
 	YearFilter    string
+	NoCache       bool
 }
 
 // Result holds the outcome counts of a verify operation.
@@ -38,7 +42,15 @@ type Result struct {
 	Inconsistent   int
 	Fixed          int
 	Errors         int
+	CacheHits      int
 	ProcessedBytes int64
+}
+
+// FileEntry is one source file discovered during the per-year pre-walk.
+type FileEntry struct {
+	AbsPath   string
+	RelToYear string // forward-slash, used as cache key
+	Info      os.FileInfo
 }
 
 // Verifier orchestrates integrity checks on the library.
@@ -47,6 +59,9 @@ type Verifier struct {
 	ext    MetadataExtractor
 	logger *logging.Logger
 	hasher *defaults.Hasher
+
+	mu           sync.Mutex
+	currentCache *Cache
 }
 
 // New creates a new Verifier, initializing the hasher from cfg.HashAlgo
@@ -66,6 +81,26 @@ func New(cfg Config, ext MetadataExtractor, logger *logging.Logger) *Verifier {
 
 // Verify runs integrity checks on the library and returns the result.
 func (v *Verifier) Verify() (*Result, error) {
+	// Signal handler: on SIGINT/SIGTERM, flush+close the currently-open cache
+	// before letting the process exit. Ensures in-progress verified entries
+	// land on disk even on user-interrupt.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	doneCh := make(chan struct{})
+	defer func() {
+		signal.Stop(sigCh)
+		close(doneCh)
+	}()
+	go func() {
+		select {
+		case <-sigCh:
+			v.closeCurrentCache()
+			os.Exit(130)
+		case <-doneCh:
+			return
+		}
+	}()
+
 	years, err := library.ListYearsFiltered(v.cfg.LibraryPath, v.cfg.YearFilter)
 	if err != nil {
 		return nil, fmt.Errorf("list years: %w", err)
@@ -83,7 +118,7 @@ func (v *Verifier) Verify() (*Result, error) {
 	for i, year := range years {
 		yearDir := filepath.Join(v.cfg.LibraryPath, year)
 
-		// Validate year level — only sources/ and processed/ allowed
+		// Validate year level — only sources/, processed/, sources-manual/, .imv/ allowed
 		if err := v.verifyYearLevel(yearDir, year, result); err != nil {
 			return result, err
 		}
@@ -93,8 +128,20 @@ func (v *Verifier) Verify() (*Result, error) {
 			return result, err
 		}
 
-		// Validate individual source files
-		if err := v.verifySourceFiles(yearDir, year, i+1, len(years), result); err != nil {
+		// Pre-walk this year's source files and stat each once.
+		entries, err := v.walkAndStatYear(yearDir, year)
+		if err != nil {
+			return result, err
+		}
+
+		// Open the per-year cache (nil if disabled/fast/failed).
+		yc := v.openYearCache(yearDir, year, entries)
+		v.setCurrentCache(yc)
+
+		err = v.verifySourceFiles(year, entries, yc, i+1, len(years), result)
+		_ = yc.Close()
+		v.setCurrentCache(nil)
+		if err != nil {
 			return result, err
 		}
 	}
@@ -102,34 +149,105 @@ func (v *Verifier) Verify() (*Result, error) {
 	return result, nil
 }
 
-// verifySourceFiles checks each file in sources/ for correct path and hash.
-func (v *Verifier) verifySourceFiles(yearDir, year string, yearIdx, yearTotal int, result *Result) error {
-	files, err := library.ListSourceFiles(yearDir)
+// walkAndStatYear lists all source files under yearDir and stats each.
+// Paths that disappear between walk and stat are silently dropped.
+func (v *Verifier) walkAndStatYear(yearDir, year string) ([]FileEntry, error) {
+	paths, err := library.ListSourceFiles(yearDir)
 	if err != nil {
-		return fmt.Errorf("list source files for %s: %w", year, err)
+		return nil, fmt.Errorf("list source files for %s: %w", year, err)
+	}
+	entries := make([]FileEntry, 0, len(paths))
+	for _, p := range paths {
+		fi, err := os.Stat(p)
+		if err != nil {
+			continue
+		}
+		rel, err := filepath.Rel(yearDir, p)
+		if err != nil {
+			continue
+		}
+		entries = append(entries, FileEntry{
+			AbsPath:   p,
+			RelToYear: filepath.ToSlash(rel),
+			Info:      fi,
+		})
+	}
+	return entries, nil
+}
+
+// openYearCache loads the year's cache file, builds the intersection with
+// currently-on-disk files, and atomically compacts to just the valid entries.
+// Returns nil if caching is disabled or any step fails (non-fatal).
+func (v *Verifier) openYearCache(yearDir, year string, entries []FileEntry) *Cache {
+	if v.cfg.NoCache || v.cfg.Fast {
+		return nil
 	}
 
+	cachePath := CacheFilePath(yearDir)
+	c, err := Load(cachePath)
+	if err != nil {
+		v.logger.Warn("cache for %s: load failed: %v (continuing without cache)", year, err)
+		return nil
+	}
+
+	keep := make(map[string]Entry)
+	for _, fe := range entries {
+		if existing, ok := c.Lookup(fe.RelToYear); ok {
+			if c.Matches(existing, fe.Info, v.cfg.HashAlgo) {
+				keep[fe.RelToYear] = existing
+			}
+		}
+	}
+
+	if err := c.Compact(keep); err != nil {
+		v.logger.Warn("cache for %s: compact failed: %v (continuing without cache)", year, err)
+		return nil
+	}
+	return c
+}
+
+func (v *Verifier) setCurrentCache(c *Cache) {
+	v.mu.Lock()
+	v.currentCache = c
+	v.mu.Unlock()
+}
+
+func (v *Verifier) closeCurrentCache() {
+	v.mu.Lock()
+	c := v.currentCache
+	v.mu.Unlock()
+	_ = c.Close()
+}
+
+// verifySourceFiles checks each file in sources/ for correct path and hash.
+// Consumes pre-walked entries; no internal walk or stat.
+func (v *Verifier) verifySourceFiles(
+	year string,
+	entries []FileEntry,
+	yc *Cache,
+	yearIdx, yearTotal int,
+	result *Result,
+) error {
 	if v.cfg.Randomize {
-		rand.Shuffle(len(files), func(i, j int) {
-			files[i], files[j] = files[j], files[i]
+		rand.Shuffle(len(entries), func(i, j int) {
+			entries[i], entries[j] = entries[j], entries[i]
 		})
 	}
 
-	total := len(files)
-	for i, filePath := range files {
+	total := len(entries)
+	for i, fe := range entries {
+		filePath := fe.AbsPath
 		prefix := fmt.Sprintf("[%s %d/%d] ", year, yearIdx, yearTotal)
-		stats := fmt.Sprintf("valid:%d fixed:%d inconsistent:%d %s",
-			result.Verified, result.Fixed, result.Inconsistent, logging.FormatBytes(result.ProcessedBytes))
+		stats := fmt.Sprintf("valid:%d cached:%d fixed:%d inconsistent:%d %s",
+			result.Verified, result.CacheHits, result.Fixed, result.Inconsistent, logging.FormatBytes(result.ProcessedBytes))
 		v.logger.ProgressWithStats(i+1, total, prefix, stats, filePath)
 
-		if info, err := os.Stat(filePath); err == nil {
-			result.ProcessedBytes += info.Size()
-		}
+		result.ProcessedBytes += fe.Info.Size()
 
 		baseName := filepath.Base(filePath)
 
 		// Skip ignored files
-		if defaults.IsIgnoredFile(baseName) {
+		if isSkippableInLibrary(baseName) {
 			continue
 		}
 
@@ -141,20 +259,11 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, yearIdx, yearTotal in
 
 		// Structural consistency: filename date must match date dir,
 		// date dir year must match year level
-		sourcesDir := filepath.Join(yearDir, "sources")
-		relToSources, err := filepath.Rel(sourcesDir, filePath)
-		if err != nil {
-			result.Errors++
-			v.logger.Error("resolve relative path %s: %v", filePath, err)
-			continue
-		}
-
-		// relToSources is like: "Device (image)/2024-08-20/2024-08-20_18-45-03_abc123.jpg"
-		parts := strings.Split(filepath.ToSlash(relToSources), "/")
-		if len(parts) >= 3 {
+		parts := strings.Split(fe.RelToYear, "/")
+		// fe.RelToYear is like: "sources/Device (image)/2024-08-20/<file>"
+		if len(parts) >= 4 && parts[0] == "sources" {
 			dateDir := parts[len(parts)-2]
 
-			// Date dir year must match year level
 			if len(dateDir) >= 4 && dateDir[:4] != year {
 				result.Inconsistent++
 				v.logger.Warn("date dir %s has wrong year (expected %s): %s", dateDir, year, filePath)
@@ -164,7 +273,6 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, yearIdx, yearTotal in
 				continue
 			}
 
-			// Filename date must match date dir
 			parsed, parseErr := pathbuilder.ParseSourceFilename(baseName)
 			if parseErr == nil {
 				fileDate := parsed.DateTime.Format("2006-01-02")
@@ -192,6 +300,15 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, yearIdx, yearTotal in
 				result.Verified++
 			}
 			continue
+		}
+
+		// Cache hit: skip expensive ext.Extract + path rebuild.
+		if yc != nil {
+			if entry, ok := yc.Lookup(fe.RelToYear); ok && yc.Matches(entry, fe.Info, v.cfg.HashAlgo) {
+				result.Verified++
+				result.CacheHits++
+				continue
+			}
 		}
 
 		// Full mode: extract metadata, verify path and hash
@@ -228,6 +345,9 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, yearIdx, yearTotal in
 			// Path matches — hash is correct by definition since the expected
 			// path is built from the content hash
 			result.Verified++
+			if err := yc.AppendVerified(NewEntry(fe.RelToYear, fe.Info, v.cfg.HashAlgo)); err != nil {
+				v.logger.Warn("cache append failed for %s: %v", filePath, err)
+			}
 		} else {
 			// Path mismatch (wrong dir, wrong hash in filename, etc.)
 			result.Inconsistent++
@@ -238,6 +358,7 @@ func (v *Verifier) verifySourceFiles(yearDir, year string, yearIdx, yearTotal in
 					v.logger.Error("fix move %s → %s: %v", filePath, expectedPath, err)
 				} else {
 					result.Fixed++
+					// Deliberately not caching fixed files — they'll re-verify next run.
 				}
 			}
 		}
@@ -254,7 +375,7 @@ func (v *Verifier) verifyLibraryRoot(result *Result) error {
 	}
 
 	for _, e := range entries {
-		if defaults.IsIgnoredFile(e.Name()) {
+		if isSkippableInLibrary(e.Name()) {
 			continue
 		}
 		if !e.IsDir() {
@@ -277,17 +398,23 @@ func (v *Verifier) verifyLibraryRoot(result *Result) error {
 	return nil
 }
 
-// verifyYearLevel checks that a year directory contains only sources/ and processed/.
+// verifyYearLevel checks that a year directory contains only sources/, processed/,
+// sources-manual/, and .imv/.
 func (v *Verifier) verifyYearLevel(yearDir, year string, result *Result) error {
 	entries, err := os.ReadDir(yearDir)
 	if err != nil {
 		return fmt.Errorf("read year dir %s: %w", year, err)
 	}
 
-	allowed := map[string]bool{"sources": true, "processed": true, "sources-manual": true}
+	allowed := map[string]bool{
+		"sources":        true,
+		"processed":      true,
+		"sources-manual": true,
+		cacheDirName:     true,
+	}
 
 	for _, e := range entries {
-		if defaults.IsIgnoredFile(e.Name()) {
+		if isSkippableInLibrary(e.Name()) {
 			continue
 		}
 		if !e.IsDir() {
@@ -323,7 +450,7 @@ func (v *Verifier) verifySourcesStructure(yearDir, year string, result *Result) 
 	}
 
 	for _, e := range entries {
-		if defaults.IsIgnoredFile(e.Name()) {
+		if isSkippableInLibrary(e.Name()) {
 			continue
 		}
 		if !e.IsDir() {
@@ -363,7 +490,7 @@ func (v *Verifier) verifyDeviceDir(deviceDir, year, deviceName string, result *R
 	}
 
 	for _, e := range entries {
-		if defaults.IsIgnoredFile(e.Name()) {
+		if isSkippableInLibrary(e.Name()) {
 			continue
 		}
 		if !e.IsDir() {
@@ -385,4 +512,3 @@ func (v *Verifier) verifyDeviceDir(deviceDir, year, deviceName string, result *R
 
 	return nil
 }
-
