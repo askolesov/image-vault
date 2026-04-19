@@ -101,9 +101,16 @@ func (v *Verifier) Verify() (*Result, error) {
 func (v *Verifier) verifyWithContext(ctx context.Context) (*Result, error) {
 	// On signal, flush and close the active cache asynchronously so
 	// in-progress entries land on disk even if the main loop is blocked
-	// inside a long-running Extract call. stopCloser cancels the callback
-	// on normal exit so we don't spawn a goroutine for nothing.
-	stopCloser := context.AfterFunc(ctx, v.closeCurrentCache)
+	// inside a long-running Extract call. Also reset the signal handlers
+	// so a second Ctrl+C terminates the process via the default handler
+	// instead of being swallowed by NotifyContext — the user's escape
+	// hatch if the graceful exit is taking too long. stopCloser cancels
+	// the callback on normal exit so we don't spawn a goroutine for
+	// nothing.
+	stopCloser := context.AfterFunc(ctx, func() {
+		v.closeCurrentCache()
+		signal.Reset(os.Interrupt, syscall.SIGTERM)
+	})
 	defer stopCloser()
 
 	years, err := library.ListYearsFiltered(v.cfg.LibraryPath, v.cfg.YearFilter)

@@ -2,7 +2,9 @@ package verifier
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -191,7 +193,7 @@ func (c *Cache) Compact(keep map[string]Entry) error {
 		return fmt.Errorf("close tmp cache: %w", err)
 	}
 
-	if err := os.Rename(tmpPath, c.path); err != nil {
+	if err := renameOverwrite(tmpPath, c.path); err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("rename cache: %w", err)
 	}
@@ -279,6 +281,23 @@ func (c *Cache) Close() error {
 		return flushErr
 	}
 	return closeErr
+}
+
+// renameOverwrite renames src to dst, falling back to remove + rename when
+// the filesystem refuses to overwrite an existing destination. POSIX
+// rename(2) overwrites, but some filesystems — notably SMB/CIFS shares and
+// several FUSE mounts — return EEXIST instead. The fallback is not atomic;
+// the brief window where dst is absent is acceptable for the cache, where
+// a missing file simply means "no hits" on the next reader.
+func renameOverwrite(src, dst string) error {
+	err := os.Rename(src, dst)
+	if err == nil || !errors.Is(err, fs.ErrExist) {
+		return err
+	}
+	if removeErr := os.Remove(dst); removeErr != nil {
+		return err
+	}
+	return os.Rename(src, dst)
 }
 
 func writeCacheHeader(w *bufio.Writer) error {
