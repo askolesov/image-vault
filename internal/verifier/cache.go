@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/askolesov/image-vault/internal/defaults"
@@ -19,7 +18,7 @@ const (
 	cacheDirName       = ".imv"
 	cacheFormatVersion = "v1"
 	cacheFieldSep      = "\t"
-	cacheFlushInterval = 10 * time.Second
+	persistInterval    = 30 * time.Second
 )
 
 // Entry is a single cached verification record.
@@ -31,18 +30,18 @@ type Entry struct {
 	VerifiedAt int64
 }
 
-// Cache holds per-year verification cache state.
+// Cache holds per-year verification cache state. It is an in-memory
+// map[string]Entry plus a Persist method that atomically rewrites the
+// whole file. No file handle is held open between persists — this is
+// the key property that keeps the cache stable across cross-filesystem
+// scenarios (SMB/CIFS, FUSE, permission drift between machines).
+//
 // A nil *Cache is a valid no-op receiver for every method.
-// The mutex guards concurrent access from a signal handler goroutine
-// (which may Close the cache on SIGINT) and the main verify goroutine
-// (which Appends and Flushes).
 type Cache struct {
-	mu        sync.Mutex
-	path      string
-	entries   map[string]Entry
-	file      *os.File
-	buf       *bufio.Writer
-	lastFlush time.Time
+	path        string
+	entries     map[string]Entry
+	lastPersist time.Time
+	dirty       bool
 }
 
 // isSkippableInLibrary reports whether a filename should be silently skipped
@@ -77,9 +76,12 @@ func NewEntry(relPath string, fi os.FileInfo, algo string) Entry {
 	}
 }
 
-// Load parses the cache file at path (if present) and returns a populated Cache.
-// A missing file is not an error. Malformed lines are silently skipped.
-// The returned Cache is not yet open for append — call Compact first.
+// Load parses the cache file at path (if present) and returns a populated
+// Cache. A missing file is not an error. Malformed lines are silently
+// skipped. The returned Cache has lastPersist zero-valued, so the first
+// Record after Load will trigger a persist; callers that want to control
+// initial persist timing (e.g. openYearCache after intersection) should
+// call Persist explicitly.
 func Load(path string) (*Cache, error) {
 	c := &Cache{
 		path:    path,
@@ -89,22 +91,15 @@ func Load(path string) (*Cache, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			debugLog("load: %q missing; starting empty", path)
 			return c, nil
 		}
-		debugLog("load: open %q failed: %v", path, err)
 		return nil, fmt.Errorf("open cache: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 
-	if fi, err := f.Stat(); err == nil {
-		debugLog("load: %q size=%d mtime=%s", path, fi.Size(), fi.ModTime().Format(time.RFC3339))
-	}
-
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 
-	var malformed int
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -112,17 +107,14 @@ func Load(path string) (*Cache, error) {
 		}
 		e, ok := parseCacheLine(line)
 		if !ok {
-			malformed++
 			continue
 		}
 		c.entries[e.RelPath] = e
 	}
 	if err := scanner.Err(); err != nil {
-		debugLog("load: scan error: %v", err)
 		return c, fmt.Errorf("scan cache: %w", err)
 	}
 
-	debugLog("load ok: %q entries=%d malformed=%d", path, len(c.entries), malformed)
 	return c, nil
 }
 
@@ -162,24 +154,23 @@ func (c *Cache) Entries() map[string]Entry {
 	return out
 }
 
-// Compact rewrites the cache file to contain only the given keep entries,
-// then opens it for append. Uses tmp + fsync + rename for atomicity.
-// Leaves the original file untouched on any failure.
-func (c *Cache) Compact(keep map[string]Entry) error {
+// Persist atomically rewrites the on-disk cache file from the current
+// in-memory entries. Uses tmp + fsync + rename (with remove+rename
+// fallback for filesystems that refuse overwrite). On success: clears
+// dirty and updates lastPersist. On failure: leaves the original file
+// untouched and the in-memory map unchanged.
+func (c *Cache) Persist() error {
 	if c == nil {
 		return nil
 	}
-	debugLog("compact start: path=%q keep=%d", c.path, len(keep))
 
 	if err := os.MkdirAll(filepath.Dir(c.path), 0o755); err != nil {
-		debugLog("compact: mkdir failed: %v", err)
 		return fmt.Errorf("mkdir cache dir: %w", err)
 	}
 
 	tmpPath := c.path + ".tmp"
 	tmp, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
-		debugLog("compact: open tmp %q failed: %v", tmpPath, err)
 		return fmt.Errorf("create tmp cache: %w", err)
 	}
 
@@ -189,7 +180,7 @@ func (c *Cache) Compact(keep map[string]Entry) error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("write cache header: %w", err)
 	}
-	for _, e := range keep {
+	for _, e := range c.entries {
 		if _, err := fmt.Fprintln(writer, formatCacheLine(e)); err != nil {
 			_ = tmp.Close()
 			_ = os.Remove(tmpPath)
@@ -210,99 +201,36 @@ func (c *Cache) Compact(keep map[string]Entry) error {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("close tmp cache: %w", err)
 	}
-	debugLog("compact: tmp written ok at %q", tmpPath)
 
 	if err := renameOverwrite(tmpPath, c.path); err != nil {
-		debugLog("compact: renameOverwrite failed: %v", err)
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("rename cache: %w", err)
 	}
 
-	c.entries = make(map[string]Entry, len(keep))
-	maps.Copy(c.entries, keep)
-
-	f, err := os.OpenFile(c.path, os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		debugLog("compact: reopen for append failed: %v", err)
-		return fmt.Errorf("reopen cache for append: %w", err)
-	}
-	c.file = f
-	c.buf = bufio.NewWriter(f)
-	c.lastFlush = time.Now()
-	debugLog("compact ok: path=%q entries=%d", c.path, len(c.entries))
-
+	c.lastPersist = time.Now()
+	c.dirty = false
 	return nil
 }
 
-// AppendVerified records a verified file. Paths containing tab or newline
-// are rejected (they would corrupt the TSV format). Flush + fsync if the
-// time since last flush exceeds cacheFlushInterval.
-func (c *Cache) AppendVerified(e Entry) error {
+// Record inserts e into the in-memory cache. If persistInterval has
+// elapsed since lastPersist, Record also calls Persist as a side effect.
+// Paths containing tab or newline are rejected (they would corrupt the
+// TSV format) — the map is not mutated and no persist happens in that
+// case.
+func (c *Cache) Record(e Entry) error {
 	if c == nil {
-		return nil
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.file == nil || c.buf == nil {
 		return nil
 	}
 	if strings.ContainsAny(e.RelPath, "\t\n") {
 		return fmt.Errorf("cache: path contains tab or newline: %q", e.RelPath)
 	}
-	if _, err := fmt.Fprintln(c.buf, formatCacheLine(e)); err != nil {
-		return fmt.Errorf("append cache line: %w", err)
-	}
 	c.entries[e.RelPath] = e
+	c.dirty = true
 
-	if time.Since(c.lastFlush) > cacheFlushInterval {
-		return c.flushLocked()
+	if time.Since(c.lastPersist) > persistInterval {
+		return c.Persist()
 	}
 	return nil
-}
-
-// Flush empties the buffer and fsyncs.
-func (c *Cache) Flush() error {
-	if c == nil {
-		return nil
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.flushLocked()
-}
-
-// flushLocked performs the flush work; caller must hold c.mu.
-func (c *Cache) flushLocked() error {
-	if c.file == nil || c.buf == nil {
-		return nil
-	}
-	if err := c.buf.Flush(); err != nil {
-		return fmt.Errorf("flush cache buffer: %w", err)
-	}
-	if err := c.file.Sync(); err != nil {
-		return fmt.Errorf("fsync cache: %w", err)
-	}
-	c.lastFlush = time.Now()
-	return nil
-}
-
-// Close flushes and closes the cache file. Idempotent.
-func (c *Cache) Close() error {
-	if c == nil {
-		return nil
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.file == nil {
-		return nil
-	}
-	flushErr := c.flushLocked()
-	closeErr := c.file.Close()
-	c.file = nil
-	c.buf = nil
-	if flushErr != nil {
-		return flushErr
-	}
-	return closeErr
 }
 
 // renameOverwrite renames src over dst. POSIX rename(2) overwrites on the
@@ -312,23 +240,10 @@ func (c *Cache) Close() error {
 // cache, not durable state.
 func renameOverwrite(src, dst string) error {
 	if err := os.Rename(src, dst); err == nil {
-		debugLog("rename: %q -> %q ok", src, dst)
 		return nil
-	} else {
-		debugLog("rename failed: %q -> %q: %v; retrying with remove", src, dst, err)
 	}
 	_ = os.Remove(dst)
 	return os.Rename(src, dst)
-}
-
-// debugLog writes a diagnostic line to stderr when IMV_DEBUG is set. Used
-// to trace cache-path decisions without polluting normal output. The test
-// suite leaves IMV_DEBUG unset, so output is silent during CI.
-func debugLog(format string, args ...any) {
-	if os.Getenv("IMV_DEBUG") == "" {
-		return
-	}
-	_, _ = fmt.Fprintf(os.Stderr, "[imv-debug] "+format+"\n", args...)
 }
 
 func writeCacheHeader(w *bufio.Writer) error {

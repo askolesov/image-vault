@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -112,7 +111,7 @@ func TestCacheLoad_EmbeddedNewlineSplitsLine(t *testing.T) {
 	// The first fragment is malformed and dropped. The second fragment
 	// happens to look like a valid record with path="part2". This is
 	// benign: "part2" won't exist on disk, so compaction drops it.
-	// Write-side protection against this lives in AppendVerified.
+	// Write-side protection against this lives in Record.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cache")
 	content := "part1\npart2\t100\t1\tmd5\t10\n"
@@ -189,174 +188,171 @@ func TestCacheMatches_CrossHostSMBScenario(t *testing.T) {
 		"cache entry written at second precision should match ns-precision disk mtime")
 }
 
-func TestCacheCompact_HappyPath(t *testing.T) {
+// TestCachePersist_HappyPath: Persist writes the header and all in-memory
+// entries to disk, creating the parent .imv/ directory if needed.
+func TestCachePersist_HappyPath(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".imv", "verify.cache")
-	// Pre-existing content that should be replaced entirely.
-	writeCacheFile(t, path,
-		"old\t1\t1\tmd5\t1\n"+
-			"kept\t100\t500\tmd5\t999\n")
 
 	c, err := Load(path)
 	require.NoError(t, err)
+	c.entries["a.jpg"] = Entry{RelPath: "a.jpg", Size: 100, MtimeNs: 500, HashAlgo: "md5", VerifiedAt: 999}
+	c.dirty = true
 
-	keep := map[string]Entry{
-		"kept": {RelPath: "kept", Size: 100, MtimeNs: 500, HashAlgo: "md5", VerifiedAt: 999},
-	}
-	require.NoError(t, c.Compact(keep))
-	require.NoError(t, c.Close())
+	require.NoError(t, c.Persist())
 
-	// Reload and check content.
+	// Reload to confirm on-disk content.
 	c2, err := Load(path)
 	require.NoError(t, err)
 	assert.Len(t, c2.Entries(), 1)
-	e, ok := c2.Lookup("kept")
+	got, ok := c2.Lookup("a.jpg")
 	require.True(t, ok)
-	assert.Equal(t, int64(100), e.Size)
+	assert.Equal(t, int64(100), got.Size)
 
-	// Ensure old entry is gone.
-	_, ok = c2.Lookup("old")
-	assert.False(t, ok)
+	// dirty flag cleared after a successful persist.
+	assert.False(t, c.dirty)
 }
 
-func TestCacheCompact_EmptyKeep(t *testing.T) {
+// TestCachePersist_OverwritesExistingFile: second Persist replaces first
+// cleanly — regression for the cross-machine "rename: file exists" case.
+func TestCachePersist_OverwritesExistingFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".imv", "verify.cache")
-	writeCacheFile(t, path, "old\t1\t1\tmd5\t1\n")
 
-	c, err := Load(path)
+	c1, err := Load(path)
 	require.NoError(t, err)
-	require.NoError(t, c.Compact(map[string]Entry{}))
-	require.NoError(t, c.Close())
+	c1.entries["a.jpg"] = Entry{RelPath: "a.jpg", Size: 1, MtimeNs: 1, HashAlgo: "md5", VerifiedAt: 1}
+	c1.dirty = true
+	require.NoError(t, c1.Persist())
 
 	c2, err := Load(path)
 	require.NoError(t, err)
-	assert.Empty(t, c2.Entries())
+	c2.entries = map[string]Entry{
+		"b.jpg": {RelPath: "b.jpg", Size: 2, MtimeNs: 2, HashAlgo: "md5", VerifiedAt: 2},
+	}
+	c2.dirty = true
+	require.NoError(t, c2.Persist())
+
+	c3, err := Load(path)
+	require.NoError(t, err)
+	_, hasA := c3.Lookup("a.jpg")
+	_, hasB := c3.Lookup("b.jpg")
+	assert.False(t, hasA, "old entry should have been overwritten")
+	assert.True(t, hasB, "new entry should be present")
 }
 
-func TestCacheCompact_CreatesDirIfMissing(t *testing.T) {
+// TestCachePersist_EmptyWritesHeader: persisting with no entries yields
+// a file with just the header comment.
+func TestCachePersist_EmptyWritesHeader(t *testing.T) {
 	dir := t.TempDir()
-	// Deep nested cache path where .imv/ doesn't exist yet.
+	path := filepath.Join(dir, ".imv", "verify.cache")
+
+	c, err := Load(path)
+	require.NoError(t, err)
+	require.NoError(t, c.Persist())
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(string(content), "#"), "should start with comment header")
+	assert.Contains(t, string(content), "verify-cache v1")
+}
+
+// TestCachePersist_CreatesDirIfMissing: .imv/ is created as needed.
+func TestCachePersist_CreatesDirIfMissing(t *testing.T) {
+	dir := t.TempDir()
 	path := filepath.Join(dir, "2024", ".imv", "verify.cache")
 
 	c, err := Load(path)
 	require.NoError(t, err)
-	require.NoError(t, c.Compact(map[string]Entry{
-		"file": {RelPath: "file", Size: 10, MtimeNs: 5, HashAlgo: "md5", VerifiedAt: 1},
-	}))
-	require.NoError(t, c.Close())
+	c.entries["file"] = Entry{RelPath: "file", Size: 10, MtimeNs: 5, HashAlgo: "md5", VerifiedAt: 1}
+	c.dirty = true
+	require.NoError(t, c.Persist())
 
 	_, err = os.Stat(path)
 	assert.NoError(t, err)
 }
 
-func TestCacheAppendVerified_PersistsAfterFlush(t *testing.T) {
+// TestCacheRecord_InMemoryOnly: Record inserts into the map and flips
+// dirty, but does not write to disk when the persist interval has not
+// elapsed. Verify by checking the cache file does not exist yet.
+func TestCacheRecord_InMemoryOnly(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".imv", "verify.cache")
 
 	c, err := Load(path)
 	require.NoError(t, err)
-	require.NoError(t, c.Compact(map[string]Entry{}))
+	// Make Record think we persisted "just now" so its cadence check doesn't fire.
+	c.lastPersist = time.Now()
 
 	e := Entry{RelPath: "new", Size: 42, MtimeNs: 7, HashAlgo: "md5", VerifiedAt: 100}
-	require.NoError(t, c.AppendVerified(e))
-	require.NoError(t, c.Flush())
+	require.NoError(t, c.Record(e))
 
-	c2, err := Load(path)
-	require.NoError(t, err)
-	got, ok := c2.Lookup("new")
+	assert.True(t, c.dirty)
+	got, ok := c.Lookup("new")
 	require.True(t, ok)
 	assert.Equal(t, int64(42), got.Size)
+
+	// No file should exist on disk yet.
+	_, err = os.Stat(path)
+	assert.True(t, os.IsNotExist(err), "Record must not write to disk when interval has not elapsed")
 }
 
-func TestCacheAppendVerified_PersistsAfterClose(t *testing.T) {
+// TestCacheRecord_TriggersPersistAfterInterval: once persistInterval has
+// elapsed since lastPersist, Record triggers a Persist() as a side effect.
+func TestCacheRecord_TriggersPersistAfterInterval(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".imv", "verify.cache")
 
 	c, err := Load(path)
 	require.NoError(t, err)
-	require.NoError(t, c.Compact(map[string]Entry{}))
-	require.NoError(t, c.AppendVerified(Entry{RelPath: "x", Size: 1, MtimeNs: 1, HashAlgo: "md5", VerifiedAt: 1}))
-	require.NoError(t, c.Close())
+	// Pretend we last persisted an hour ago.
+	c.lastPersist = time.Now().Add(-1 * time.Hour)
 
+	e := Entry{RelPath: "new", Size: 1, MtimeNs: 1, HashAlgo: "md5", VerifiedAt: 1}
+	require.NoError(t, c.Record(e))
+
+	// File should exist and contain the entry.
 	c2, err := Load(path)
 	require.NoError(t, err)
-	_, ok := c2.Lookup("x")
-	assert.True(t, ok)
+	_, ok := c2.Lookup("new")
+	assert.True(t, ok, "Record should have triggered Persist after interval elapsed")
+
+	// lastPersist should be updated (near now), dirty cleared.
+	assert.WithinDuration(t, time.Now(), c.lastPersist, 5*time.Second)
+	assert.False(t, c.dirty)
 }
 
-func TestCacheAppendVerified_RejectsTabInPath(t *testing.T) {
+// TestCacheRecord_RejectsTabInPath: path containing \t is rejected
+// without mutating the map or writing to disk.
+func TestCacheRecord_RejectsTabInPath(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".imv", "verify.cache")
 
 	c, err := Load(path)
 	require.NoError(t, err)
-	require.NoError(t, c.Compact(map[string]Entry{}))
+	c.lastPersist = time.Now().Add(-1 * time.Hour) // would otherwise persist
 
-	err = c.AppendVerified(Entry{RelPath: "has\ttab", Size: 1, MtimeNs: 1, HashAlgo: "md5", VerifiedAt: 1})
+	err = c.Record(Entry{RelPath: "has\ttab", Size: 1, MtimeNs: 1, HashAlgo: "md5", VerifiedAt: 1})
 	assert.Error(t, err)
-	require.NoError(t, c.Close())
 
-	// File should not contain a corrupted record.
-	content, err := os.ReadFile(path)
-	require.NoError(t, err)
-	assert.NotContains(t, string(content), "has\ttab")
+	_, ok := c.Lookup("has\ttab")
+	assert.False(t, ok, "map must not contain the rejected entry")
+	_, err = os.Stat(path)
+	assert.True(t, os.IsNotExist(err), "no persist should have happened")
 }
 
-func TestCacheAppendVerified_RejectsNewlineInPath(t *testing.T) {
+// TestCacheRecord_RejectsNewlineInPath: same as above for \n.
+func TestCacheRecord_RejectsNewlineInPath(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".imv", "verify.cache")
 
 	c, err := Load(path)
 	require.NoError(t, err)
-	require.NoError(t, c.Compact(map[string]Entry{}))
 
-	err = c.AppendVerified(Entry{RelPath: "has\nnewline", Size: 1, MtimeNs: 1, HashAlgo: "md5", VerifiedAt: 1})
+	err = c.Record(Entry{RelPath: "has\nnewline", Size: 1, MtimeNs: 1, HashAlgo: "md5", VerifiedAt: 1})
 	assert.Error(t, err)
-	require.NoError(t, c.Close())
-}
-
-func TestCacheClose_Idempotent(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, ".imv", "verify.cache")
-
-	c, err := Load(path)
-	require.NoError(t, err)
-	require.NoError(t, c.Compact(map[string]Entry{}))
-	require.NoError(t, c.Close())
-	require.NoError(t, c.Close(), "second Close should be no-op")
-}
-
-// TestCacheConcurrentAppendAndClose models the SIGINT path: the main
-// goroutine calls AppendVerified in a tight loop while a second goroutine
-// (the signal handler) calls Close. Before the mutex was added, `go test
-// -race` would flag concurrent access to bufio.Writer and *os.File.
-func TestCacheConcurrentAppendAndClose(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, ".imv", "verify.cache")
-
-	c, err := Load(path)
-	require.NoError(t, err)
-	require.NoError(t, c.Compact(map[string]Entry{}))
-
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		// Hammer appends until Close is called and sets file=nil.
-		for i := range 10_000 {
-			_ = c.AppendVerified(Entry{
-				RelPath:    "sources/Dev (image)/2024-01-15/a.jpg",
-				Size:       1,
-				MtimeNs:    int64(i),
-				HashAlgo:   "md5",
-				VerifiedAt: time.Now().Unix(),
-			})
-		}
-	})
-
-	// Small sleep to let appends start, then close concurrently.
-	time.Sleep(1 * time.Millisecond)
-	assert.NoError(t, c.Close())
-	wg.Wait()
+	_, ok := c.Lookup("has\nnewline")
+	assert.False(t, ok)
 }
 
 func TestCacheNilReceiver_AllMethodsNoOp(t *testing.T) {
@@ -366,10 +362,8 @@ func TestCacheNilReceiver_AllMethodsNoOp(t *testing.T) {
 	assert.False(t, ok)
 	assert.False(t, c.Matches(Entry{}, nil, "md5"))
 	assert.Nil(t, c.Entries())
-	assert.NoError(t, c.Compact(nil))
-	assert.NoError(t, c.AppendVerified(Entry{}))
-	assert.NoError(t, c.Flush())
-	assert.NoError(t, c.Close())
+	assert.NoError(t, c.Record(Entry{}))
+	assert.NoError(t, c.Persist())
 }
 
 func TestCacheLoad_CorruptGarbageReturnsEmpty(t *testing.T) {
@@ -381,21 +375,6 @@ func TestCacheLoad_CorruptGarbageReturnsEmpty(t *testing.T) {
 	c, err := Load(path)
 	require.NoError(t, err)
 	assert.Empty(t, c.Entries())
-}
-
-func TestCacheCompactWritesHeader(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, ".imv", "verify.cache")
-
-	c, err := Load(path)
-	require.NoError(t, err)
-	require.NoError(t, c.Compact(map[string]Entry{}))
-	require.NoError(t, c.Close())
-
-	content, err := os.ReadFile(path)
-	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(string(content), "#"), "cache should start with a comment header")
-	assert.Contains(t, string(content), "verify-cache v1")
 }
 
 // TestRenameOverwrite_FallbackWhenEEXIST stubs os.Rename to fail once with
@@ -417,37 +396,6 @@ func TestRenameOverwrite_FallbackWhenEEXIST(t *testing.T) {
 	assert.Equal(t, "new", string(got))
 	_, err = os.Stat(src)
 	assert.True(t, os.IsNotExist(err), "src should be gone after rename")
-}
-
-// TestCompact_OverwritesExistingCache: ensures Compact replaces an existing
-// verify.cache file in the normal case — regression for the user-reported
-// "compact failed: rename: file exists" on cross-machine library access.
-func TestCompact_OverwritesExistingCache(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, ".imv", "verify.cache")
-
-	// First compaction creates the file.
-	c1, err := Load(path)
-	require.NoError(t, err)
-	require.NoError(t, c1.Compact(map[string]Entry{
-		"a.jpg": {RelPath: "a.jpg", Size: 1, MtimeNs: 1, HashAlgo: "md5", VerifiedAt: 1},
-	}))
-	require.NoError(t, c1.Close())
-
-	// Second compaction must overwrite the existing file on any FS.
-	c2, err := Load(path)
-	require.NoError(t, err)
-	require.NoError(t, c2.Compact(map[string]Entry{
-		"b.jpg": {RelPath: "b.jpg", Size: 2, MtimeNs: 2, HashAlgo: "md5", VerifiedAt: 2},
-	}))
-	require.NoError(t, c2.Close())
-
-	c3, err := Load(path)
-	require.NoError(t, err)
-	_, hasA := c3.Lookup("a.jpg")
-	_, hasB := c3.Lookup("b.jpg")
-	assert.False(t, hasA, "old entry should have been overwritten")
-	assert.True(t, hasB, "new entry should be present")
 }
 
 func TestCacheFilePath(t *testing.T) {
