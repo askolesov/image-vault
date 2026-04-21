@@ -4,7 +4,12 @@
 package extcounter
 
 import (
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -54,5 +59,73 @@ func Aggregate(n *DirNode) {
 		for k, v := range c.Total {
 			n.Total[k] += v
 		}
+	}
+}
+
+// Walk walks root and returns a tree with Direct counts filled in.
+// Call Aggregate on the returned tree to populate Total before
+// rendering. Warnings from unreadable subdirectories are written to
+// stderrW; only errors on the root itself are returned as an error.
+func Walk(root string, opts Options, stderrW io.Writer) (*DirNode, error) {
+	info, err := os.Stat(root)
+	if err != nil {
+		return nil, fmt.Errorf("stat %q: %w", root, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%q is not a directory", root)
+	}
+
+	cleanRoot := filepath.Clean(root)
+	rootNode := &DirNode{
+		Name:   cleanRoot,
+		Direct: make(map[string]int),
+	}
+	nodes := map[string]*DirNode{cleanRoot: rootNode}
+
+	err = filepath.WalkDir(cleanRoot, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			fmt.Fprintf(stderrW, "warning: cannot read %s: %v\n", path, walkErr)
+			if d != nil && d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if path != cleanRoot && !opts.IncludeHidden && strings.HasPrefix(d.Name(), ".") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if d.IsDir() {
+			if path == cleanRoot {
+				return nil
+			}
+			parent := nodes[filepath.Dir(path)]
+			node := &DirNode{Name: d.Name(), Direct: make(map[string]int)}
+			parent.Children = append(parent.Children, node)
+			nodes[path] = node
+			return nil
+		}
+
+		parent := nodes[filepath.Dir(path)]
+		parent.Direct[extractExt(d.Name())]++
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	sortTree(rootNode)
+	return rootNode, nil
+}
+
+func sortTree(n *DirNode) {
+	sort.Slice(n.Children, func(i, j int) bool {
+		return n.Children[i].Name < n.Children[j].Name
+	})
+	for _, c := range n.Children {
+		sortTree(c)
 	}
 }

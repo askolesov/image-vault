@@ -1,9 +1,14 @@
 package extcounter
 
 import (
+	"bytes"
+	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExtractExt(t *testing.T) {
@@ -84,4 +89,64 @@ func TestAggregate_Idempotent(t *testing.T) {
 	}
 	Aggregate(root)
 	assert.Equal(t, first, root.Total)
+}
+
+func writeEmpty(t *testing.T, path string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(path, nil, 0o644))
+}
+
+func TestWalk_FlatDir_MixedCase(t *testing.T) {
+	dir := t.TempDir()
+	writeEmpty(t, filepath.Join(dir, "a.JPG"))
+	writeEmpty(t, filepath.Join(dir, "b.jpg"))
+	writeEmpty(t, filepath.Join(dir, "c.Jpeg"))
+	writeEmpty(t, filepath.Join(dir, "d.jpeg"))
+	writeEmpty(t, filepath.Join(dir, "README"))
+
+	var stderr bytes.Buffer
+	root, err := Walk(dir, Options{}, &stderr)
+	require.NoError(t, err)
+	require.NotNil(t, root)
+	assert.Equal(t, map[string]int{"jpg": 2, "jpeg": 2, "(none)": 1}, root.Direct)
+	assert.Empty(t, root.Children)
+	assert.Empty(t, stderr.String())
+}
+
+func TestWalk_Nested_RollupMatchesSumOfDirect(t *testing.T) {
+	dir := t.TempDir()
+	writeEmpty(t, filepath.Join(dir, "root.jpg"))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "a"), 0o755))
+	writeEmpty(t, filepath.Join(dir, "a", "a1.xmp"))
+	writeEmpty(t, filepath.Join(dir, "a", "a2.xmp"))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "a", "aa"), 0o755))
+	writeEmpty(t, filepath.Join(dir, "a", "aa", "deep.mov"))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "b"), 0o755))
+	writeEmpty(t, filepath.Join(dir, "b", "b1.jpg"))
+
+	root, err := Walk(dir, Options{}, io.Discard)
+	require.NoError(t, err)
+	Aggregate(root)
+
+	assert.Equal(t, map[string]int{"jpg": 2, "xmp": 2, "mov": 1}, root.Total)
+	require.Len(t, root.Children, 2)
+	assert.Equal(t, "a", root.Children[0].Name)
+	assert.Equal(t, "b", root.Children[1].Name)
+	assert.Equal(t, map[string]int{"xmp": 2, "mov": 1}, root.Children[0].Total)
+	assert.Equal(t, map[string]int{"jpg": 1}, root.Children[1].Total)
+
+	require.Len(t, root.Children[0].Children, 1)
+	assert.Equal(t, "aa", root.Children[0].Children[0].Name)
+	assert.Equal(t, map[string]int{"mov": 1}, root.Children[0].Children[0].Total)
+}
+
+func TestWalk_EmptySubdir(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "empty"), 0o755))
+
+	root, err := Walk(dir, Options{}, io.Discard)
+	require.NoError(t, err)
+	require.Len(t, root.Children, 1)
+	assert.Equal(t, "empty", root.Children[0].Name)
+	assert.Empty(t, root.Children[0].Direct)
 }
