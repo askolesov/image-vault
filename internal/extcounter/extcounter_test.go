@@ -188,3 +188,41 @@ func TestWalk_RootBasenameStartingWithDot_NotFilteredAsHidden(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, map[string]int{"jpg": 1}, root.Direct)
 }
+
+func TestWalk_RootMissing(t *testing.T) {
+	_, err := Walk(filepath.Join(t.TempDir(), "nonexistent"), Options{}, io.Discard)
+	require.Error(t, err)
+}
+
+func TestWalk_RootIsFile(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "a.jpg")
+	writeEmpty(t, filePath)
+
+	_, err := Walk(filePath, Options{}, io.Discard)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not a directory")
+}
+
+func TestWalk_UnreadableSubdir(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: chmod 0 wouldn't restrict access")
+	}
+	dir := t.TempDir()
+	writeEmpty(t, filepath.Join(dir, "ok.jpg"))
+	badDir := filepath.Join(dir, "bad")
+	require.NoError(t, os.Mkdir(badDir, 0o755))
+	writeEmpty(t, filepath.Join(badDir, "inside.png"))
+	require.NoError(t, os.Chmod(badDir, 0))
+	t.Cleanup(func() { _ = os.Chmod(badDir, 0o755) })
+
+	var stderr bytes.Buffer
+	root, err := Walk(dir, Options{}, &stderr)
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]int{"jpg": 1}, root.Direct)
+	require.Len(t, root.Children, 1)
+	assert.Equal(t, "bad", root.Children[0].Name)
+	assert.Empty(t, root.Children[0].Direct)
+	assert.Contains(t, stderr.String(), "warning: cannot read")
+}
