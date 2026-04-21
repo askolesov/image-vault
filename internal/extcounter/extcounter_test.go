@@ -150,3 +150,41 @@ func TestWalk_EmptySubdir(t *testing.T) {
 	assert.Equal(t, "empty", root.Children[0].Name)
 	assert.Empty(t, root.Children[0].Direct)
 }
+
+func TestWalk_HiddenSkippedByDefault(t *testing.T) {
+	dir := t.TempDir()
+	writeEmpty(t, filepath.Join(dir, "visible.jpg"))
+	writeEmpty(t, filepath.Join(dir, ".DS_Store"))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, ".hidden_dir"), 0o755))
+	writeEmpty(t, filepath.Join(dir, ".hidden_dir", "secret.txt"))
+
+	root, err := Walk(dir, Options{}, io.Discard)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int{"jpg": 1}, root.Direct)
+	assert.Empty(t, root.Children)
+}
+
+func TestWalk_IncludeHidden(t *testing.T) {
+	dir := t.TempDir()
+	writeEmpty(t, filepath.Join(dir, ".DS_Store"))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, ".hidden_dir"), 0o755))
+	writeEmpty(t, filepath.Join(dir, ".hidden_dir", "secret.txt"))
+
+	root, err := Walk(dir, Options{IncludeHidden: true}, io.Discard)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int{"(none)": 1}, root.Direct)
+	require.Len(t, root.Children, 1)
+	assert.Equal(t, ".hidden_dir", root.Children[0].Name)
+	assert.Equal(t, map[string]int{"txt": 1}, root.Children[0].Direct)
+}
+
+func TestWalk_RootBasenameStartingWithDot_NotFilteredAsHidden(t *testing.T) {
+	parent := t.TempDir()
+	dotRoot := filepath.Join(parent, ".dotted_root")
+	require.NoError(t, os.Mkdir(dotRoot, 0o755))
+	writeEmpty(t, filepath.Join(dotRoot, "a.jpg"))
+
+	root, err := Walk(dotRoot, Options{}, io.Discard)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]int{"jpg": 1}, root.Direct)
+}
