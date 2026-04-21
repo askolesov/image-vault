@@ -20,7 +20,14 @@ func newToolsExtCountCmd() *cobra.Command {
 			if depth < 0 {
 				return fmt.Errorf("--depth must be >= 0")
 			}
-			tree, err := extcounter.Walk(args[0], extcounter.Options{IncludeHidden: includeHidden}, os.Stderr)
+			progressCb := func(p extcounter.ProgressInfo) {
+				_, _ = fmt.Fprintf(os.Stderr, "\rScanned %d dirs, %d files", p.DirsScanned, p.FilesScanned)
+			}
+			tree, err := extcounter.Walk(args[0], extcounter.Options{
+				IncludeHidden:    includeHidden,
+				ProgressCallback: progressCb,
+			}, os.Stderr)
+			_, _ = fmt.Fprintln(os.Stderr)
 			if err != nil {
 				return err
 			}

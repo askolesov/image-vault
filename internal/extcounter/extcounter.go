@@ -25,8 +25,22 @@ type DirNode struct {
 
 // Options configures Walk.
 type Options struct {
-	IncludeHidden bool
+	IncludeHidden    bool
+	ProgressCallback ProgressCallback
 }
+
+// ProgressInfo is passed to ProgressCallback during Walk.
+type ProgressInfo struct {
+	DirsScanned  int
+	FilesScanned int
+}
+
+// ProgressCallback is invoked periodically during Walk. It may be nil.
+type ProgressCallback func(ProgressInfo)
+
+// progressInterval is how often (in dirs scanned) the progress callback
+// is invoked during Walk.
+const progressInterval = 100
 
 // extractExt returns the extension bucket for a filename.
 //
@@ -81,6 +95,7 @@ func Walk(root string, opts Options, stderrW io.Writer) (*DirNode, error) {
 		Direct: make(map[string]int),
 	}
 	nodes := map[string]*DirNode{cleanRoot: rootNode}
+	var dirs, files int
 
 	err = filepath.WalkDir(cleanRoot, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -100,21 +115,31 @@ func Walk(root string, opts Options, stderrW io.Writer) (*DirNode, error) {
 
 		if d.IsDir() {
 			if path == cleanRoot {
+				dirs++
 				return nil
 			}
 			parent := nodes[filepath.Dir(path)]
 			node := &DirNode{Name: d.Name(), Direct: make(map[string]int)}
 			parent.Children = append(parent.Children, node)
 			nodes[path] = node
+			dirs++
+			if opts.ProgressCallback != nil && dirs%progressInterval == 0 {
+				opts.ProgressCallback(ProgressInfo{DirsScanned: dirs, FilesScanned: files})
+			}
 			return nil
 		}
 
 		parent := nodes[filepath.Dir(path)]
 		parent.Direct[extractExt(d.Name())]++
+		files++
 		return nil
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if opts.ProgressCallback != nil {
+		opts.ProgressCallback(ProgressInfo{DirsScanned: dirs, FilesScanned: files})
 	}
 
 	sortTree(rootNode)

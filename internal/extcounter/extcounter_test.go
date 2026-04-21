@@ -204,6 +204,34 @@ func TestWalk_RootIsFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "not a directory")
 }
 
+func TestWalk_ProgressCallback_FinalInvocationReportsAllCounts(t *testing.T) {
+	dir := t.TempDir()
+	writeEmpty(t, filepath.Join(dir, "a.jpg"))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "sub"), 0o755))
+	writeEmpty(t, filepath.Join(dir, "sub", "b.jpg"))
+	writeEmpty(t, filepath.Join(dir, "sub", "c.png"))
+
+	var last ProgressInfo
+	var calls int
+	cb := func(p ProgressInfo) {
+		last = p
+		calls++
+	}
+
+	_, err := Walk(dir, Options{ProgressCallback: cb}, io.Discard)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, calls, 1, "callback must fire at least once (final)")
+	assert.Equal(t, 2, last.DirsScanned) // root + sub
+	assert.Equal(t, 3, last.FilesScanned)
+}
+
+func TestWalk_ProgressCallback_NilIsFine(t *testing.T) {
+	dir := t.TempDir()
+	writeEmpty(t, filepath.Join(dir, "a.jpg"))
+	_, err := Walk(dir, Options{}, io.Discard)
+	require.NoError(t, err)
+}
+
 func TestWalk_UnreadableSubdir(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root: chmod 0 wouldn't restrict access")
