@@ -103,6 +103,7 @@ imv tools info <file>               # Show file metadata as JSON
 imv tools scan <dir> -o scan.json   # Produce directory manifest
 imv tools diff a.json b.json        # Compare two manifests
 imv tools remove-empty-dirs         # Clean up empty directories
+imv tools ext-count <dir>           # Tree of per-dir file extension counts
 ```
 
 ### version
