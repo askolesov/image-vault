@@ -41,3 +41,18 @@ func extractExt(name string) string {
 	}
 	return ext
 }
+
+// Aggregate fills Total on every node by rolling up Direct counts from
+// the entire subtree. Calling it twice yields the same result.
+func Aggregate(n *DirNode) {
+	n.Total = make(map[string]int, len(n.Direct))
+	for k, v := range n.Direct {
+		n.Total[k] = v
+	}
+	for _, c := range n.Children {
+		Aggregate(c)
+		for k, v := range c.Total {
+			n.Total[k] += v
+		}
+	}
+}
