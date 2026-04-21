@@ -84,7 +84,7 @@ func Walk(root string, opts Options, stderrW io.Writer) (*DirNode, error) {
 
 	err = filepath.WalkDir(cleanRoot, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
-			fmt.Fprintf(stderrW, "warning: cannot read %s: %v\n", path, walkErr)
+			_, _ = fmt.Fprintf(stderrW, "warning: cannot read %s: %v\n", path, walkErr)
 			if d != nil && d.IsDir() {
 				return filepath.SkipDir
 			}

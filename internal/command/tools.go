@@ -12,6 +12,7 @@ func newToolsCmd() *cobra.Command {
 		newToolsScanCmd(),
 		newToolsDiffCmd(),
 		newToolsInfoCmd(),
+		newToolsExtCountCmd(),
 	)
 	return cmd
 }

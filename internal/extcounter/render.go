@@ -11,7 +11,7 @@ import (
 // root. depth 0 prints only the root line; depth 1 prints the root
 // plus its immediate children; depth N prints N levels below.
 func Render(root *DirNode, depth int, w io.Writer) {
-	fmt.Fprintf(w, "[%s] — %s\n", root.Name, formatExts(root.Total))
+	_, _ = fmt.Fprintf(w, "[%s] — %s\n", root.Name, formatExts(root.Total))
 	if depth > 0 {
 		renderChildren(root.Children, "", depth-1, w)
 	}
@@ -29,7 +29,7 @@ func renderChildren(children []*DirNode, parentPrefix string, remainingDepth int
 			connector = "├── "
 			childPrefix = "│   "
 		}
-		fmt.Fprintf(w, "%s%s[%s] — %s\n", parentPrefix, connector, c.Name, formatExts(c.Total))
+		_, _ = fmt.Fprintf(w, "%s%s[%s] — %s\n", parentPrefix, connector, c.Name, formatExts(c.Total))
 		if remainingDepth > 0 {
 			renderChildren(c.Children, parentPrefix+childPrefix, remainingDepth-1, w)
 		}
