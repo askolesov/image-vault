@@ -91,6 +91,21 @@ func (l *Logger) ProgressWithStats(current, total int, prefix, stats, currentFil
 	}
 }
 
+// Scan reports an unbounded scan with running counts. On a TTY it
+// overwrites in place; off-TTY it prints a single line each call (the
+// caller is expected to throttle off-TTY callers to avoid log spam).
+func (l *Logger) Scan(label string, dirs, files int) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.isTTY {
+		_, _ = fmt.Fprintf(l.stderr, "\r\033[K[scan] %s: %s dirs, %s files",
+			label, FormatNumber(dirs), FormatNumber(files))
+	} else {
+		_, _ = fmt.Fprintf(l.stderr, "[scan] %s: %s dirs, %s files\n",
+			label, FormatNumber(dirs), FormatNumber(files))
+	}
+}
+
 // ClearProgress clears the progress line (TTY only).
 func (l *Logger) ClearProgress() {
 	l.mu.Lock()

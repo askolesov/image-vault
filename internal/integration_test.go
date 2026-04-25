@@ -192,7 +192,7 @@ func TestVerifyCache_MtimeMismatchCausesMiss(t *testing.T) {
 	require.NoError(t, err)
 
 	// Pick one source file and bump its mtime by 1 hour.
-	files, err := library.ListSourceFiles(filepath.Join(libDir, "2024"))
+	files, err := library.ListSourceFiles(filepath.Join(libDir, "2024"), library.ListSourceFilesProgress{})
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(files), 2)
 	newMtime := time.Now().Add(time.Hour)
@@ -222,7 +222,7 @@ func TestVerifyCache_DeletedFileCompactedOut(t *testing.T) {
 	require.NoError(t, err)
 
 	// Delete one source file.
-	files, err := library.ListSourceFiles(filepath.Join(libDir, "2024"))
+	files, err := library.ListSourceFiles(filepath.Join(libDir, "2024"), library.ListSourceFilesProgress{})
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(files), 1)
 	require.NoError(t, os.Remove(files[0]))

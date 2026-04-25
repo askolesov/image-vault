@@ -139,7 +139,11 @@ func (v *Verifier) Verify() (*Result, error) {
 // walkAndStatYear lists all source files under yearDir and stats each.
 // Paths that disappear between walk and stat are silently dropped.
 func (v *Verifier) walkAndStatYear(yearDir, year string) ([]FileEntry, error) {
-	paths, err := library.ListSourceFiles(yearDir)
+	paths, err := library.ListSourceFiles(yearDir, library.ListSourceFilesProgress{
+		OnScan: func(dirs, files int) {
+			v.logger.Scan(year, dirs, files)
+		},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("list source files for %s: %w", year, err)
 	}
