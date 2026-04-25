@@ -69,15 +69,12 @@ func TransferFile(source, target string, opts Options) (Action, error) {
 	_, statErr := os.Stat(target)
 	targetExists := statErr == nil
 
+	// Library unchanged → Skipped, even under --move (source is still removed).
 	if targetExists && opts.SkipCompare {
-		if opts.Move {
-			if opts.DryRun {
-				return ActionWouldMove, nil
-			}
+		if opts.Move && !opts.DryRun {
 			if err := os.Remove(source); err != nil {
 				return "", fmt.Errorf("remove source: %w", err)
 			}
-			return ActionMoved, nil
 		}
 		return ActionSkipped, nil
 	}
@@ -89,14 +86,10 @@ func TransferFile(source, target string, opts Options) (Action, error) {
 		}
 
 		if identical {
-			if opts.Move {
-				if opts.DryRun {
-					return ActionWouldMove, nil
-				}
+			if opts.Move && !opts.DryRun {
 				if err := os.Remove(source); err != nil {
 					return "", fmt.Errorf("remove source: %w", err)
 				}
-				return ActionMoved, nil
 			}
 			return ActionSkipped, nil
 		}
