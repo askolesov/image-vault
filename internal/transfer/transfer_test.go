@@ -76,11 +76,12 @@ func TestTransferIdenticalExistsMove(t *testing.T) {
 
 	action, err := TransferFile(src, dst, Options{Move: true, NewHash: testHasher()})
 	require.NoError(t, err)
-	assert.Equal(t, ActionMoved, action)
+	// Library is unchanged, so the action is Skipped — but with --move
+	// the source is still removed as housekeeping.
+	assert.Equal(t, ActionSkipped, action)
 
-	// Source is gone
 	_, err = os.Stat(src)
-	assert.True(t, os.IsNotExist(err))
+	assert.True(t, os.IsNotExist(err), "source should still be removed under --move")
 }
 
 func TestTransferDifferentContentReplace(t *testing.T) {
@@ -232,11 +233,44 @@ func TestTransferIdenticalDryRunMove(t *testing.T) {
 
 	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true, NewHash: testHasher()})
 	require.NoError(t, err)
-	assert.Equal(t, ActionWouldMove, action)
+	assert.Equal(t, ActionSkipped, action)
 
 	// Source should still exist (dry run)
 	_, err = os.Stat(src)
 	assert.NoError(t, err)
+}
+
+func TestTransferSkipCompareExistsMove(t *testing.T) {
+	dir := t.TempDir()
+	// Different content — but SkipCompare trusts the target without hashing,
+	// so the library is treated as already correct.
+	src := writeFile(t, dir, "src/photo.jpg", "src-content")
+	dst := writeFile(t, dir, "dst/photo.jpg", "dst-content")
+
+	action, err := TransferFile(src, dst, Options{Move: true, SkipCompare: true})
+	require.NoError(t, err)
+	assert.Equal(t, ActionSkipped, action)
+
+	_, err = os.Stat(src)
+	assert.True(t, os.IsNotExist(err), "source should be removed under --move")
+
+	// Destination is untouched.
+	data, err := os.ReadFile(dst)
+	require.NoError(t, err)
+	assert.Equal(t, "dst-content", string(data))
+}
+
+func TestTransferSkipCompareDryRunMove(t *testing.T) {
+	dir := t.TempDir()
+	src := writeFile(t, dir, "src/photo.jpg", "src-content")
+	dst := writeFile(t, dir, "dst/photo.jpg", "dst-content")
+
+	action, err := TransferFile(src, dst, Options{Move: true, DryRun: true, SkipCompare: true})
+	require.NoError(t, err)
+	assert.Equal(t, ActionSkipped, action)
+
+	_, err = os.Stat(src)
+	assert.NoError(t, err, "source must remain on dry-run")
 }
 
 func TestCompareFilesNonexistent(t *testing.T) {
