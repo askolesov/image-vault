@@ -247,6 +247,48 @@ func TestImportMoveMode(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
+// TestImportMoveDuplicate covers the case where the library already contains
+// the same file at the correct path. With --move, the source is still removed
+// (housekeeping) but nothing changes in the library, so the file should count
+// as Skipped, not Imported, and ProcessedBytes should not advance.
+func TestImportMoveDuplicate(t *testing.T) {
+	srcDir := t.TempDir()
+	libDir := t.TempDir()
+
+	srcFile := filepath.Join(srcDir, "photo.jpg")
+	createTestFile(t, srcFile, "jpeg-dup-content")
+
+	cfg := Config{
+		LibraryPath: libDir,
+		HashAlgo:    "md5",
+		Move:        true,
+	}
+
+	// Seed the library by running an initial import (copy mode).
+	seedImp, err := New(Config{LibraryPath: libDir, HashAlgo: "md5"}, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
+	seedResult, err := seedImp.ImportDir(srcDir)
+	require.NoError(t, err)
+	require.Equal(t, 1, seedResult.Imported)
+
+	// Source still exists (copy mode); now move-import the same source again.
+	_, err = os.Stat(srcFile)
+	require.NoError(t, err)
+
+	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
+	result, err := imp.ImportDir(srcDir)
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, result.Imported, "library is unchanged")
+	assert.Equal(t, 1, result.Skipped, "duplicate-on-move counts as skipped")
+	assert.Equal(t, int64(0), result.ProcessedBytes, "no bytes were transferred to the library")
+
+	// Source is removed despite being skipped — that's the point of --move.
+	_, err = os.Stat(srcFile)
+	assert.True(t, os.IsNotExist(err), "source must be removed under --move")
+}
+
 func TestImportDryRun(t *testing.T) {
 	srcDir := t.TempDir()
 	libDir := t.TempDir()
