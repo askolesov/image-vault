@@ -74,7 +74,7 @@ func TestListSourceFiles(t *testing.T) {
 	makeFile(t, dir, "sources/iphone/2024-01-01/img2.jpg", "data")
 	makeFile(t, dir, "sources/canon/2024-02-15/img3.cr2", "data")
 
-	files, err := ListSourceFiles(dir)
+	files, err := ListSourceFiles(dir, ListSourceFilesProgress{})
 	require.NoError(t, err)
 	assert.Len(t, files, 3)
 }
@@ -149,7 +149,7 @@ func TestListYearsFilteredNotADir(t *testing.T) {
 func TestListSourceFilesNoSourcesDir(t *testing.T) {
 	dir := t.TempDir()
 	// No sources/ directory at all
-	files, err := ListSourceFiles(dir)
+	files, err := ListSourceFiles(dir, ListSourceFilesProgress{})
 	require.NoError(t, err)
 	assert.Nil(t, files)
 }
@@ -159,7 +159,7 @@ func TestListSourceFilesSourcesIsFile(t *testing.T) {
 	// sources is a file, not a directory
 	makeFile(t, dir, "sources", "not a directory")
 
-	files, err := ListSourceFiles(dir)
+	files, err := ListSourceFiles(dir, ListSourceFilesProgress{})
 	require.NoError(t, err)
 	assert.Nil(t, files)
 }
@@ -224,7 +224,7 @@ func TestListSourceFilesPermissionError(t *testing.T) {
 	})
 
 	// Should skip permission errors gracefully
-	files, err := ListSourceFiles(dir)
+	files, err := ListSourceFiles(dir, ListSourceFilesProgress{})
 	require.NoError(t, err)
 	// The restricted dir's files should be skipped
 	assert.Empty(t, files)
@@ -321,6 +321,37 @@ func TestRemoveEmptyDirsPermissionError(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestListSourceFilesProgress(t *testing.T) {
+	dir := t.TempDir()
+	makeFile(t, dir, "sources/iphone/2024-01-01/img1.jpg", "data")
+	makeFile(t, dir, "sources/iphone/2024-01-01/img2.jpg", "data")
+	makeFile(t, dir, "sources/canon/2024-02-15/img3.cr2", "data")
+
+	type call struct{ dirs, files int }
+	var calls []call
+	files, err := ListSourceFiles(dir, ListSourceFilesProgress{
+		OnScan: func(d, f int) {
+			calls = append(calls, call{d, f})
+		},
+	})
+	require.NoError(t, err)
+	assert.Len(t, files, 3)
+	require.NotEmpty(t, calls, "OnScan should be called at least once")
+
+	final := calls[len(calls)-1]
+	assert.Equal(t, 3, final.files, "final tally should report all 3 files")
+	assert.GreaterOrEqual(t, final.dirs, 1, "final tally should count at least the sources dir")
+}
+
+func TestListSourceFilesNilProgress(t *testing.T) {
+	dir := t.TempDir()
+	makeFile(t, dir, "sources/iphone/2024-01-01/img1.jpg", "data")
+
+	files, err := ListSourceFiles(dir, ListSourceFilesProgress{})
+	require.NoError(t, err)
+	assert.Len(t, files, 1)
+}
+
 func TestListSourceFilesStatError(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("skipping permission test as root")
@@ -337,6 +368,6 @@ func TestListSourceFilesStatError(t *testing.T) {
 		_ = os.Chmod(dir, 0o755)
 	})
 
-	_, err := ListSourceFiles(dir)
+	_, err := ListSourceFiles(dir, ListSourceFilesProgress{})
 	assert.Error(t, err)
 }

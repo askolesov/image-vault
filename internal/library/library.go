@@ -53,9 +53,24 @@ func ListYearsFiltered(libraryPath, yearFilter string) ([]string, error) {
 	return []string{yearFilter}, nil
 }
 
+// ListSourceFilesProgress reports progress during ListSourceFiles.
+type ListSourceFilesProgress struct {
+	// OnScan is called periodically during the walk with running totals,
+	// and once more at the end with the final tally. May be nil.
+	OnScan func(dirs, files int)
+}
+
+// listSourceFilesProgressInterval is how often (in dirs) OnScan fires
+// during the walk.
+const listSourceFilesProgressInterval = 100
+
 // ListSourceFiles walks <yearDir>/sources/ recursively and returns all file paths (not dirs).
 // Skips permission errors. Returns nil if sources/ doesn't exist.
-func ListSourceFiles(yearDir string) ([]string, error) {
+//
+// If p.OnScan is non-nil it is invoked every listSourceFilesProgressInterval
+// directories with running totals, and once more at the end with the final
+// tally. OnScan is not called when sources/ doesn't exist.
+func ListSourceFiles(yearDir string, p ListSourceFilesProgress) ([]string, error) {
 	sourcesDir := filepath.Join(yearDir, "sources")
 
 	info, err := os.Stat(sourcesDir)
@@ -69,7 +84,11 @@ func ListSourceFiles(yearDir string) ([]string, error) {
 		return nil, nil
 	}
 
-	var files []string
+	var (
+		files     []string
+		dirs      int
+		fileCount int
+	)
 	err = filepath.WalkDir(sourcesDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			if os.IsPermission(err) {
@@ -77,13 +96,23 @@ func ListSourceFiles(yearDir string) ([]string, error) {
 			}
 			return err
 		}
-		if !d.IsDir() {
-			files = append(files, path)
+		if d.IsDir() {
+			dirs++
+			if p.OnScan != nil && dirs%listSourceFilesProgressInterval == 0 {
+				p.OnScan(dirs, fileCount)
+			}
+			return nil
 		}
+		files = append(files, path)
+		fileCount++
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("walking sources: %w", err)
+	}
+
+	if p.OnScan != nil {
+		p.OnScan(dirs, fileCount)
 	}
 
 	return files, nil
