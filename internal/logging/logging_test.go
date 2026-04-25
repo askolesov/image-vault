@@ -193,6 +193,30 @@ func TestLoggerProgressZeroTotal(t *testing.T) {
 	assert.Contains(t, out, "(0%)")
 }
 
+func TestLoggerScanNonTTY(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	l := New(&stdout, &stderr, false)
+
+	l.Scan("2024", 1_234, 56_789)
+
+	out := stderr.String()
+	assert.Equal(t, "[scan] 2024: 1,234 dirs, 56,789 files\n", out)
+	assert.Empty(t, stdout.String())
+}
+
+func TestLoggerScanTTY(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	l := New(&stdout, &stderr, true)
+
+	l.Scan("2024", 100, 4_123)
+
+	out := stderr.String()
+	assert.Contains(t, out, "\r\033[K")
+	assert.Contains(t, out, "[scan] 2024: 100 dirs, 4,123 files")
+	assert.NotContains(t, out, "\n")
+	assert.Empty(t, stdout.String())
+}
+
 func TestLoggerSummaryWithFixedAndVerified(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	l := New(&stdout, &stderr, false)
