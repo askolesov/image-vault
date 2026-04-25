@@ -774,6 +774,39 @@ func TestVerifyLibraryRootUnexpectedDir(t *testing.T) {
 	assert.Equal(t, 1, result.Inconsistent)
 }
 
+// TestVerifyUndatedRootAllowed: undated/ at vault root with arbitrary freeform
+// content is accepted without warning, even with FailFast=true.
+func TestVerifyUndatedRootAllowed(t *testing.T) {
+	libDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "undated", "loose-folder"), 0o755))
+	createTestFile(t, filepath.Join(libDir, "undated", "anything.jpg"), "data")
+	createTestFile(t, filepath.Join(libDir, "undated", "loose-folder", "nested.txt"), "data")
+
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 0, result.Inconsistent)
+}
+
+// TestVerifyUndatedRootCoexistsWithUnexpected: undated/ does not mask warnings
+// from other unknown root directories.
+func TestVerifyUndatedRootCoexistsWithUnexpected(t *testing.T) {
+	libDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "undated"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "random"), 0o755))
+
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false}, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Inconsistent)
+}
+
 func TestVerifyYearLevelUnexpectedEntries(t *testing.T) {
 	libDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(libDir, "2024", "sources"), 0o755))
