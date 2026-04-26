@@ -358,7 +358,8 @@ func (v *Verifier) verifySourceFiles(
 	return nil
 }
 
-// verifyLibraryRoot checks that the library root contains only year directories.
+// verifyLibraryRoot checks that the library root contains only year directories
+// and the optional freeform "undated" directory.
 func (v *Verifier) verifyLibraryRoot(result *Result) error {
 	entries, err := os.ReadDir(v.cfg.LibraryPath)
 	if err != nil {
@@ -377,12 +378,13 @@ func (v *Verifier) verifyLibraryRoot(result *Result) error {
 			}
 			continue
 		}
-		if !library.IsYearDir(e.Name()) {
-			result.Inconsistent++
-			v.logger.Warn("unexpected directory in library root: %s (expected YYYY)", e.Name())
-			if v.cfg.FailFast {
-				return fmt.Errorf("unexpected directory in library root: %s", e.Name())
-			}
+		if library.IsYearDir(e.Name()) || e.Name() == "undated" {
+			continue
+		}
+		result.Inconsistent++
+		v.logger.Warn("unexpected directory in library root: %s (expected YYYY)", e.Name())
+		if v.cfg.FailFast {
+			return fmt.Errorf("unexpected directory in library root: %s", e.Name())
 		}
 	}
 

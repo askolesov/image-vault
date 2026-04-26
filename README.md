@@ -46,6 +46,7 @@ No config files — the library is defined by its directory layout:
     processed/        # freeform, not validated
   2025/
     ...
+  undated/            # freeform, not validated; for files with no year
 ```
 
 Naming conventions:
@@ -57,6 +58,8 @@ Naming conventions:
 - **Sidecars** (`.xmp`, `.yaml`, `.json`) — placed next to their primary file
 
 Files with no EXIF make/model go to `Unknown (<type>)/`. Videos get separate device dirs by default.
+
+Use `undated/` at the vault root for files with no usable year, or that you don't want filed by year. Freeform inside, not validated. Optional — only created when you need it.
 
 ## Commands
 
