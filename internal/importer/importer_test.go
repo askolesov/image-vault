@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -221,6 +222,40 @@ func TestImportWithSidecars(t *testing.T) {
 	// Verify sidecar placed next to primary
 	matches, _ := filepath.Glob(filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", "*.xmp"))
 	assert.Len(t, matches, 1)
+}
+
+// TestImportLowercasesUppercaseSidecarExt: a sidecar with .XMP must land at
+// .xmp in the library — primary extensions are already lowercased via
+// metadata.BuildFileMetadata; the sidecar leak was on the importer side.
+func TestImportLowercasesUppercaseSidecarExt(t *testing.T) {
+	srcDir := t.TempDir()
+	libDir := t.TempDir()
+
+	createTestFile(t, filepath.Join(srcDir, "photo.jpg"), "jpeg-sidecar-uppercase")
+	createTestFile(t, filepath.Join(srcDir, "photo.XMP"), "xmp-uppercase-data")
+
+	cfg := Config{
+		LibraryPath: libDir,
+		HashAlgo:    "md5",
+	}
+
+	imp, err := New(cfg, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
+	result, err := imp.ImportDir(srcDir)
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Imported)
+
+	// Lowercase sidecar must exist.
+	lowerMatches, _ := filepath.Glob(filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", "*.xmp"))
+	assert.Len(t, lowerMatches, 1, "sidecar must land at .xmp")
+
+	// No file in the target dir should retain the uppercase extension.
+	allFiles, err := os.ReadDir(filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15"))
+	require.NoError(t, err)
+	for _, f := range allFiles {
+		ext := filepath.Ext(f.Name())
+		assert.Equal(t, strings.ToLower(ext), ext, "extension must be lowercase: %s", f.Name())
+	}
 }
 
 func TestImportMoveMode(t *testing.T) {

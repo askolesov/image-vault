@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/askolesov/image-vault/internal/defaults"
@@ -28,7 +29,10 @@ func BuildSourcePath(fm *metadata.FileMetadata, opts Options) string {
 }
 
 // BuildSidecarPath replaces the extension of primaryPath with sidecarExt.
+// sidecarExt is lowercased so built paths are always case-canonical, even
+// when callers pass through a raw filepath.Ext result.
 func BuildSidecarPath(primaryPath string, sidecarExt string) string {
+	sidecarExt = strings.ToLower(sidecarExt)
 	ext := filepath.Ext(primaryPath)
 	return primaryPath[:len(primaryPath)-len(ext)] + sidecarExt
 }

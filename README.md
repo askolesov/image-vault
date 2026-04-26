@@ -56,6 +56,7 @@ Naming conventions:
 - **Date dirs** — `YYYY-MM-DD`
 - **Filenames** — `YYYY-MM-DD_HH-MM-SS_<hash>.<ext>`
 - **Sidecars** (`.xmp`, `.yaml`, `.json`) — placed next to their primary file
+- **Extensions** — always lowercase inside `sources/`
 
 Files with no EXIF make/model go to `Unknown (<type>)/`. Videos get separate device dirs by default.
 
@@ -108,6 +109,25 @@ imv tools diff a.json b.json        # Compare two manifests
 imv tools remove-empty-dirs         # Clean up empty directories
 imv tools ext-count <dir>           # Tree of per-dir file extension counts
 ```
+
+### lib-tools
+
+Library-aware maintenance commands. Run from the library root.
+
+```bash
+imv lib-tools normalize-ext         # Lowercase extensions in <year>/sources/
+```
+
+| Flag | Description |
+|------|-------------|
+| `--year YYYY` | Only normalize files from this year |
+| `--dry-run` | Show what would be renamed without modifying files |
+| `--no-fail-fast` | Continue on errors |
+
+Walks `<year>/sources/` subtrees only. Skips `sources-manual/`,
+`processed/`, `undated/`, and the library root itself. Pure case fixup
+— no hashing, no exiftool. After running, the next `verify` will
+re-verify renamed files once (cache miss) and re-cache them.
 
 ### version
 

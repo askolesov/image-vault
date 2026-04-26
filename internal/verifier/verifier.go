@@ -234,8 +234,22 @@ func (v *Verifier) verifySourceFiles(
 			continue
 		}
 
-		// Skip sidecar files
 		ext := filepath.Ext(baseName)
+
+		// Reject non-lowercase extensions (applies in both fast and full mode).
+		// Detection is symmetric across primaries and sidecars; fix-up is split
+		// — full+fix moves uppercase primaries via the path-rebuild flow below,
+		// sidecars require 'imv lib-tools normalize-ext'.
+		if ext != strings.ToLower(ext) {
+			result.Inconsistent++
+			v.logger.Warn("non-lowercase extension: %s (run 'imv lib-tools normalize-ext' to fix)", filePath)
+			if v.cfg.FailFast {
+				return fmt.Errorf("non-lowercase extension in %s", filePath)
+			}
+			continue
+		}
+
+		// Skip sidecar files
 		if defaults.IsSidecarExtension(ext) {
 			continue
 		}

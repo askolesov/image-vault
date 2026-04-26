@@ -12,7 +12,7 @@ func NewRootCmd() *cobra.Command {
 		Use:   "imv",
 		Short: "image-vault — deterministic photo library organizer",
 	}
-	root.AddCommand(newImportCmd(), newVerifyCmd(), newVersionCmd(), newToolsCmd())
+	root.AddCommand(newImportCmd(), newVerifyCmd(), newVersionCmd(), newToolsCmd(), newLibToolsCmd())
 	return root
 }
 
