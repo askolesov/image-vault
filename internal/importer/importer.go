@@ -172,7 +172,7 @@ func (imp *Importer) importFile(g fileWithSidecars, result *Result) error {
 
 	// Transfer sidecars
 	for _, sidecar := range g.Sidecars {
-		sidecarExt := filepath.Ext(sidecar)
+		sidecarExt := strings.ToLower(filepath.Ext(sidecar))
 		sidecarDest := pathbuilder.BuildSidecarPath(destPath, sidecarExt)
 		if _, err := transfer.TransferFile(sidecar, sidecarDest, tOpts); err != nil {
 			return fmt.Errorf("transfer sidecar %s: %w", sidecar, err)

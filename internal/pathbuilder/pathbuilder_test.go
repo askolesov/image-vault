@@ -110,6 +110,14 @@ func TestBuildSidecarPath(t *testing.T) {
 	assert.Equal(t, "2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.xmp", result)
 }
 
+func TestBuildSidecarPath_LowercasesUppercaseExt(t *testing.T) {
+	// Defensive contract: callers may pass through filepath.Ext on a raw
+	// source path (e.g. ".XMP" from "IMG.XMP"). The built path must still
+	// be lowercase.
+	result := BuildSidecarPath("2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.jpg", ".XMP")
+	assert.Equal(t, "2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.xmp", result)
+}
+
 func TestBuildSourceFilename(t *testing.T) {
 	dt := time.Date(2024, 8, 20, 18, 45, 3, 0, time.UTC)
 	result := BuildSourceFilename(dt, "a1b2c3d4", ".jpg")
