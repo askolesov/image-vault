@@ -993,3 +993,73 @@ func TestVerifyFilenameDateMismatchFastMode(t *testing.T) {
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, result.Inconsistent, 1)
 }
+
+// TestVerifyFastFlagsUppercasePrimary: a primary file with .JPG extension in
+// sources/ is reported as Inconsistent under fast mode (no fix performed).
+func TestVerifyFastFlagsUppercasePrimary(t *testing.T) {
+	libDir := t.TempDir()
+	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)", "2024-08-20")
+	createTestFile(t, filepath.Join(deviceDir, "2024-08-20_18-45-03_a1b2c3d4.JPG"), "data")
+
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false, Fast: true}, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Inconsistent)
+	assert.Equal(t, 0, result.Verified)
+}
+
+// TestVerifyFastFlagsUppercaseSidecar: a sidecar with .XMP extension in
+// sources/ is reported as Inconsistent under fast mode. Sidecars used to be
+// skipped silently; the case check runs before the sidecar-skip.
+func TestVerifyFastFlagsUppercaseSidecar(t *testing.T) {
+	libDir := t.TempDir()
+	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)", "2024-08-20")
+	// Place a properly-named primary plus an uppercase sidecar next to it.
+	createTestFile(t, filepath.Join(deviceDir, "2024-08-20_18-45-03_a1b2c3d4.jpg"), "primary")
+	createTestFile(t, filepath.Join(deviceDir, "2024-08-20_18-45-03_a1b2c3d4.XMP"), "sidecar")
+
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false, Fast: true}, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Inconsistent, "uppercase sidecar must count")
+	assert.Equal(t, 1, result.Verified, "lowercase primary still counts")
+}
+
+// TestVerifyFullFlagsUppercaseSidecar: full mode also flags uppercase sidecars
+// (without fixing them — verify never moves sidecars; the warning points the
+// user at lib-tools normalize-ext).
+func TestVerifyFullFlagsUppercaseSidecar(t *testing.T) {
+	libDir := t.TempDir()
+	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)", "2024-08-20")
+	createTestFile(t, filepath.Join(deviceDir, "2024-08-20_18-45-03_a1b2c3d4.XMP"), "sidecar")
+
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: false, Fix: true}, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
+
+	result, err := v.Verify()
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Inconsistent)
+	assert.Equal(t, 0, result.Fixed, "verify --fix must not rename sidecars")
+
+	// Sidecar still exists at uppercase path.
+	_, err = os.Stat(filepath.Join(deviceDir, "2024-08-20_18-45-03_a1b2c3d4.XMP"))
+	assert.NoError(t, err)
+}
+
+// TestVerifyFullFailFastUppercase: under FailFast the case check trips
+// immediately, before the sidecar skip or the path-rebuild step.
+func TestVerifyFullFailFastUppercase(t *testing.T) {
+	libDir := t.TempDir()
+	deviceDir := filepath.Join(libDir, "2024", "sources", "Apple iPhone (image)", "2024-08-20")
+	createTestFile(t, filepath.Join(deviceDir, "2024-08-20_18-45-03_a1b2c3d4.JPG"), "data")
+
+	v, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", FailFast: true}, &fakeExtractor{}, newTestLogger())
+	require.NoError(t, err)
+
+	_, err = v.Verify()
+	require.Error(t, err)
+}
