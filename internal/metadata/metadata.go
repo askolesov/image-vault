@@ -106,15 +106,12 @@ func BuildFileMetadata(path string, exifFields map[string]interface{}, hasher *d
 	}
 	// If no EXIF datetime found, dt stays zero (time.Time{}) for determinism
 
-	// Determine Make
+	// Determine Make (defer "Unknown" assignment until after Encoder fallback)
 	make_ := getStringField(exifFields, "Make")
 	if make_ == "" {
 		make_ = getStringField(exifFields, "DeviceManufacturer")
 	}
 	make_ = defaults.NormalizeMake(make_)
-	if make_ == "" {
-		make_ = "Unknown"
-	}
 
 	// Determine Model
 	model := getStringField(exifFields, "Model")
@@ -122,6 +119,20 @@ func BuildFileMetadata(path string, exifFields map[string]interface{}, hasher *d
 		model = getStringField(exifFields, "DeviceModelName")
 	}
 	model = defaults.NormalizeModel(model)
+
+	// DJI Encoder fallback: when neither Make nor Model resolved from EXIF
+	// and Encoder identifies a DJI camera, parse Make/Model from Encoder.
+	if make_ == "" && model == "" {
+		if parsedMake, parsedModel, ok := parseDJIEncoder(getStringField(exifFields, "Encoder")); ok {
+			make_ = defaults.NormalizeMake(parsedMake)
+			model = parsedModel
+		}
+	}
+
+	// Final fallback: Make defaults to "Unknown" when no source resolved it.
+	if make_ == "" {
+		make_ = "Unknown"
+	}
 
 	// MIME type and media type
 	mimeType := getStringField(exifFields, "MIMEType")
@@ -141,6 +152,26 @@ func BuildFileMetadata(path string, exifFields map[string]interface{}, hasher *d
 		FullHash:  fullHash,
 		ShortHash: shortHash,
 	}, nil
+}
+
+// parseDJIEncoder splits an EXIF Encoder string of the form "DJI" or
+// "DJI <Model>" (case-insensitive on the "DJI" prefix, whitespace
+// trimmed) into Make="DJI" and Model="<rest>". Returns ok=false when
+// the encoder string is empty or does not match the DJI shape.
+func parseDJIEncoder(encoder string) (make_, model string, ok bool) {
+	trimmed := strings.TrimSpace(encoder)
+	if trimmed == "" {
+		return "", "", false
+	}
+	upper := strings.ToUpper(trimmed)
+	if upper == "DJI" {
+		return "DJI", "", true
+	}
+	if !strings.HasPrefix(upper, "DJI ") {
+		return "", "", false
+	}
+	rest := strings.TrimSpace(trimmed[len("DJI "):])
+	return "DJI", rest, true
 }
 
 // getStringField returns the string value for a key in the fields map.
