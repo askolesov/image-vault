@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"hash"
+	"path/filepath"
 	"strings"
 )
 
@@ -46,6 +47,41 @@ func init() {
 func IsIgnoredFile(name string) bool {
 	_, ok := ignoredFilesSet[name]
 	return ok
+}
+
+// IgnoredExtensions is the list of file extensions to ignore as junk
+// (case-insensitive). Used for DJI Osmo auxiliary files (.thm/.lrf/.scr)
+// and any future per-camera junk extensions.
+// Treat as read-only after package init — see IgnoredFiles.
+var IgnoredExtensions = []string{".thm", ".lrf", ".scr"}
+
+var ignoredExtSet map[string]struct{}
+
+func init() {
+	ignoredExtSet = make(map[string]struct{}, len(IgnoredExtensions))
+	for _, ext := range IgnoredExtensions {
+		ignoredExtSet[strings.ToLower(ext)] = struct{}{}
+	}
+}
+
+// IsIgnoredExtension returns true if the given extension matches a known
+// junk extension. The check is case-insensitive.
+func IsIgnoredExtension(ext string) bool {
+	if ext == "" {
+		return false
+	}
+	_, ok := ignoredExtSet[strings.ToLower(ext)]
+	return ok
+}
+
+// IsIgnored returns true if the given filename should be skipped because
+// it matches an OS-junk filename or a known junk extension. Callers that
+// previously called IsIgnoredFile should call IsIgnored instead.
+func IsIgnored(name string) bool {
+	if IsIgnoredFile(name) {
+		return true
+	}
+	return IsIgnoredExtension(filepath.Ext(name))
 }
 
 // SidecarExtensions is the list of recognized sidecar file extensions.
