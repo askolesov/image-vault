@@ -209,7 +209,7 @@ func isDirEffectivelyEmpty(dir string) (bool, error) {
 		if e.IsDir() {
 			return false, nil
 		}
-		if !defaults.IsIgnoredFile(e.Name()) {
+		if !defaults.IsIgnored(e.Name()) {
 			return false, nil
 		}
 	}

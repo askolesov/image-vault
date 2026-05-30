@@ -48,7 +48,7 @@ type Cache struct {
 // during structural validation — OS junk files plus any .cache file (state
 // reserved for imv, not user content).
 func isSkippableInLibrary(name string) bool {
-	if defaults.IsIgnoredFile(name) {
+	if defaults.IsIgnored(name) {
 		return true
 	}
 	return strings.EqualFold(filepath.Ext(name), ".cache")

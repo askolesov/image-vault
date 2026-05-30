@@ -3,6 +3,7 @@ package internal_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -444,4 +445,60 @@ func (d *dateForcedExtractor) Extract(path string, hasher *defaults.Hasher) (*me
 	}
 	md.DateTime = d.dt
 	return md, nil
+}
+
+// TestEndToEnd_JunkExtensionsDropped verifies that DJI auxiliary files
+// (.thm/.lrf/.scr) present in the source are not imported into the
+// library — the IsIgnored helper should filter them out during the
+// importer's enumerate phase.
+func TestEndToEnd_JunkExtensionsDropped(t *testing.T) {
+	srcDir := t.TempDir()
+	libDir := t.TempDir()
+
+	// Write a real media file plus the three junk extensions next to it.
+	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "photo.jpg"), []byte("fake-jpeg-content"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "photo.thm"), []byte("dji-thumbnail"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "photo.lrf"), []byte("dji-low-res"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "photo.scr"), []byte("dji-screen"), 0o644))
+	// Case-insensitive coverage:
+	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "video.THM"), []byte("dji-thumbnail-upper"), 0o644))
+
+	logger := logging.New(os.Stdout, os.Stderr, false)
+	ext := &fakeExtractor{}
+
+	impCfg := importer.Config{
+		LibraryPath:   libDir,
+		SeparateVideo: false,
+		HashAlgo:      "md5",
+		KeepAll:       false,
+		FailFast:      true,
+		Move:          false,
+		DryRun:        false,
+	}
+	imp, err := importer.New(impCfg, ext, logger)
+	require.NoError(t, err)
+	result, err := imp.ImportDir(srcDir)
+	require.NoError(t, err)
+
+	// Only the .jpg should have been imported. The four junk files
+	// (3 lowercase + 1 uppercase) should never reach the extractor or
+	// the library.
+	assert.Equal(t, 1, result.Imported, "only photo.jpg should be imported")
+	assert.Equal(t, 0, result.Errors)
+
+	// Walk the library and assert no junk extensions landed on disk.
+	var junkInLibrary []string
+	err = filepath.Walk(libDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		extLower := strings.ToLower(filepath.Ext(info.Name()))
+		switch extLower {
+		case ".thm", ".lrf", ".scr":
+			junkInLibrary = append(junkInLibrary, path)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Empty(t, junkInLibrary, "no junk extensions expected in library")
 }
