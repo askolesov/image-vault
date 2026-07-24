@@ -69,7 +69,7 @@ func Run(opts Options, logger *logging.Logger) (*Result, error) {
 func processOne(src string, opts Options, logger *logging.Logger, result *Result) error {
 	name := filepath.Base(src)
 
-	if defaults.IsIgnoredFile(name) {
+	if defaults.IsIgnored(name) {
 		return nil
 	}
 

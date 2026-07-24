@@ -196,7 +196,7 @@ func enumerateFiles(sourceDir string) ([]string, error) {
 		if info.IsDir() {
 			return nil
 		}
-		if defaults.IsIgnoredFile(info.Name()) {
+		if defaults.IsIgnored(info.Name()) {
 			return nil
 		}
 		files = append(files, path)

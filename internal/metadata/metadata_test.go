@@ -237,3 +237,174 @@ func TestGetStringFieldEdgeCases(t *testing.T) {
 	assert.Equal(t, "", getStringField(fields, "nil_key"))
 	assert.Equal(t, "", getStringField(fields, "missing_key"))
 }
+
+func TestBuildFileMetadataEncoderDJI_SimpleSplit(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "clip.mp4")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("fake video data"), 0644))
+
+	hasher, err := defaults.NewHasher("md5")
+	require.NoError(t, err)
+
+	fields := map[string]interface{}{
+		"MediaCreateDate": "2026:05:22 15:56:07",
+		"Encoder":         "DJI OsmoPocket4",
+		"MIMEType":        "video/mp4",
+	}
+
+	meta, err := BuildFileMetadata(tmpFile, fields, hasher)
+	require.NoError(t, err)
+	assert.Equal(t, "DJI", meta.Make)
+	assert.Equal(t, "OsmoPocket4", meta.Model)
+}
+
+func TestBuildFileMetadataEncoderDJI_MultiWordModel(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "clip.mp4")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("fake video data"), 0644))
+
+	hasher, err := defaults.NewHasher("md5")
+	require.NoError(t, err)
+
+	fields := map[string]interface{}{
+		"Encoder":  "DJI Osmo Action 5 Pro",
+		"MIMEType": "video/mp4",
+	}
+
+	meta, err := BuildFileMetadata(tmpFile, fields, hasher)
+	require.NoError(t, err)
+	assert.Equal(t, "DJI", meta.Make)
+	assert.Equal(t, "Osmo Action 5 Pro", meta.Model)
+}
+
+func TestBuildFileMetadataEncoderDJI_BrandOnly(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "clip.mp4")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("fake video data"), 0644))
+
+	hasher, err := defaults.NewHasher("md5")
+	require.NoError(t, err)
+
+	fields := map[string]interface{}{
+		"Encoder":  "DJI",
+		"MIMEType": "video/mp4",
+	}
+
+	meta, err := BuildFileMetadata(tmpFile, fields, hasher)
+	require.NoError(t, err)
+	assert.Equal(t, "DJI", meta.Make)
+	assert.Equal(t, "", meta.Model)
+}
+
+func TestBuildFileMetadataEncoderDJI_CaseInsensitive(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "clip.mp4")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("fake video data"), 0644))
+
+	hasher, err := defaults.NewHasher("md5")
+	require.NoError(t, err)
+
+	fields := map[string]interface{}{
+		"Encoder":  "dji osmopocket4",
+		"MIMEType": "video/mp4",
+	}
+
+	meta, err := BuildFileMetadata(tmpFile, fields, hasher)
+	require.NoError(t, err)
+	assert.Equal(t, "DJI", meta.Make)
+	assert.Equal(t, "osmopocket4", meta.Model)
+}
+
+func TestBuildFileMetadataEncoderDJI_WhitespacePadding(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "clip.mp4")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("fake video data"), 0644))
+
+	hasher, err := defaults.NewHasher("md5")
+	require.NoError(t, err)
+
+	fields := map[string]interface{}{
+		"Encoder":  "  DJI OsmoPocket4  ",
+		"MIMEType": "video/mp4",
+	}
+
+	meta, err := BuildFileMetadata(tmpFile, fields, hasher)
+	require.NoError(t, err)
+	assert.Equal(t, "DJI", meta.Make)
+	assert.Equal(t, "OsmoPocket4", meta.Model)
+}
+
+func TestBuildFileMetadataEncoderNonDJI_DoesNotTrigger(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "clip.mp4")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("fake video data"), 0644))
+
+	hasher, err := defaults.NewHasher("md5")
+	require.NoError(t, err)
+
+	fields := map[string]interface{}{
+		"Encoder":  "Lavf61.7.100",
+		"MIMEType": "video/mp4",
+	}
+
+	meta, err := BuildFileMetadata(tmpFile, fields, hasher)
+	require.NoError(t, err)
+	// Branch does NOT fire; existing fallback applies.
+	assert.Equal(t, "Unknown", meta.Make)
+	assert.Equal(t, "", meta.Model)
+}
+
+func TestBuildFileMetadataEncoderDJI_DoesNotOverrideExistingMake(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "clip.mp4")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("fake video data"), 0644))
+
+	hasher, err := defaults.NewHasher("md5")
+	require.NoError(t, err)
+
+	// EXIF already identifies a Sony camera. Encoder is also set but
+	// should be ignored because make_ is non-empty after the existing
+	// fallback chain.
+	fields := map[string]interface{}{
+		"Make":     "Sony",
+		"Encoder":  "DJI OsmoPocket4",
+		"MIMEType": "video/mp4",
+	}
+
+	meta, err := BuildFileMetadata(tmpFile, fields, hasher)
+	require.NoError(t, err)
+	assert.Equal(t, "Sony", meta.Make)
+	assert.Equal(t, "", meta.Model)
+}
+
+func TestBuildFileMetadataEncoderAbsent(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "clip.mp4")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("fake video data"), 0644))
+
+	hasher, err := defaults.NewHasher("md5")
+	require.NoError(t, err)
+
+	// No Encoder field present at all.
+	fields := map[string]interface{}{
+		"MIMEType": "video/mp4",
+	}
+
+	meta, err := BuildFileMetadata(tmpFile, fields, hasher)
+	require.NoError(t, err)
+	// Existing behavior preserved.
+	assert.Equal(t, "Unknown", meta.Make)
+	assert.Equal(t, "", meta.Model)
+}
+
+func TestBuildFileMetadataEncoderDJI_PrefixGuard(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "clip.mp4")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("fake video data"), 0644))
+
+	hasher, err := defaults.NewHasher("md5")
+	require.NoError(t, err)
+
+	// "DJI" appears mid-string, not as a prefix. The branch must not
+	// fire — we only accept "DJI" or "DJI <...>" at the start.
+	fields := map[string]interface{}{
+		"Encoder":  "Encoded by DJI Studio",
+		"MIMEType": "video/mp4",
+	}
+
+	meta, err := BuildFileMetadata(tmpFile, fields, hasher)
+	require.NoError(t, err)
+	assert.Equal(t, "Unknown", meta.Make)
+	assert.Equal(t, "", meta.Model)
+}

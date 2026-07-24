@@ -141,3 +141,43 @@ func TestMediaTypeConstants(t *testing.T) {
 	assert.Equal(t, MediaType("audio"), MediaTypeAudio)
 	assert.Equal(t, MediaType("other"), MediaTypeOther)
 }
+
+func TestIgnoredExtensions(t *testing.T) {
+	expected := []string{".thm", ".lrf", ".scr"}
+	for _, ext := range expected {
+		assert.Contains(t, IgnoredExtensions, ext)
+	}
+}
+
+func TestIsIgnoredExtension(t *testing.T) {
+	// Positive cases
+	assert.True(t, IsIgnoredExtension(".thm"))
+	assert.True(t, IsIgnoredExtension(".lrf"))
+	assert.True(t, IsIgnoredExtension(".scr"))
+
+	// Case-insensitive
+	assert.True(t, IsIgnoredExtension(".THM"))
+	assert.True(t, IsIgnoredExtension(".LrF"))
+	assert.True(t, IsIgnoredExtension(".SCR"))
+
+	// Negative cases
+	assert.False(t, IsIgnoredExtension(".jpg"))
+	assert.False(t, IsIgnoredExtension(".mp4"))
+	assert.False(t, IsIgnoredExtension(""))
+}
+
+func TestIsIgnored(t *testing.T) {
+	// Filename axis (delegates to IsIgnoredFile)
+	assert.True(t, IsIgnored(".DS_Store"))
+	assert.True(t, IsIgnored("Thumbs.db"))
+
+	// Extension axis (delegates to IsIgnoredExtension)
+	assert.True(t, IsIgnored("clip.thm"))
+	assert.True(t, IsIgnored("clip.LRF"))
+	assert.True(t, IsIgnored("dir/sub/clip.scr"))
+
+	// Negative cases
+	assert.False(t, IsIgnored("photo.jpg"))
+	assert.False(t, IsIgnored("clip.MP4"))
+	assert.False(t, IsIgnored(""))
+}
