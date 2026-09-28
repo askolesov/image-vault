@@ -292,7 +292,7 @@ func TestVerifyCache_FixDoesNotWriteCache(t *testing.T) {
 	// Place a file at a wrong path — the extractor's fake metadata will say it
 	// belongs under "Apple iPhone 15 Pro (image)/2024-08-20/" but we put it
 	// elsewhere.
-	wrongPath := filepath.Join(libDir, "2024", "sources", "WrongDev (image)", "2024-08-20", "placeholder.jpg")
+	wrongPath := filepath.Join(libDir, "2024", "WrongDev (image)", "2024-08-20", "placeholder.jpg")
 	require.NoError(t, os.MkdirAll(filepath.Dir(wrongPath), 0o755))
 	require.NoError(t, os.WriteFile(wrongPath, []byte("contents-to-fix"), 0o644))
 

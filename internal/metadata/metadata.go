@@ -107,24 +107,23 @@ func BuildFileMetadata(path string, exifFields map[string]interface{}, hasher *d
 	// If no EXIF datetime found, dt stays zero (time.Time{}) for determinism
 
 	// Determine Make (defer "Unknown" assignment until after Encoder fallback)
-	make_ := getStringField(exifFields, "Make")
+	make_ := strings.TrimSpace(getStringField(exifFields, "Make"))
 	if make_ == "" {
-		make_ = getStringField(exifFields, "DeviceManufacturer")
+		make_ = strings.TrimSpace(getStringField(exifFields, "DeviceManufacturer"))
 	}
-	make_ = defaults.NormalizeMake(make_)
 
 	// Determine Model
 	model := getStringField(exifFields, "Model")
 	if model == "" {
 		model = getStringField(exifFields, "DeviceModelName")
 	}
-	model = defaults.NormalizeModel(model)
+	model = strings.TrimSpace(model)
 
 	// DJI Encoder fallback: when neither Make nor Model resolved from EXIF
 	// and Encoder identifies a DJI camera, parse Make/Model from Encoder.
 	if make_ == "" && model == "" {
 		if parsedMake, parsedModel, ok := parseDJIEncoder(getStringField(exifFields, "Encoder")); ok {
-			make_ = defaults.NormalizeMake(parsedMake)
+			make_ = parsedMake
 			model = parsedModel
 		}
 	}

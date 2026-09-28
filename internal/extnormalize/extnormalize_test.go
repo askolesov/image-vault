@@ -34,7 +34,7 @@ func caseSensitive(t *testing.T) bool {
 
 func TestRun_RenamesUppercaseExt(t *testing.T) {
 	libDir := t.TempDir()
-	src := filepath.Join(libDir, "2024", "sources", "Apple (image)", "2024-08-20",
+	src := filepath.Join(libDir, "2024", "Apple (image)", "2024-08-20",
 		"2024-08-20_18-45-03_a1b2c3d4.JPG")
 	createFile(t, src, "data")
 
@@ -44,7 +44,7 @@ func TestRun_RenamesUppercaseExt(t *testing.T) {
 	assert.Equal(t, 0, result.AlreadyOK)
 
 	// Source path is gone, lowercase version exists.
-	dst := filepath.Join(libDir, "2024", "sources", "Apple (image)", "2024-08-20",
+	dst := filepath.Join(libDir, "2024", "Apple (image)", "2024-08-20",
 		"2024-08-20_18-45-03_a1b2c3d4.jpg")
 	_, err = os.Stat(dst)
 	assert.NoError(t, err)
@@ -56,7 +56,7 @@ func TestRun_RenamesUppercaseExt(t *testing.T) {
 
 func TestRun_AlreadyLowercaseSkipped(t *testing.T) {
 	libDir := t.TempDir()
-	createFile(t, filepath.Join(libDir, "2024", "sources", "Apple (image)", "2024-08-20",
+	createFile(t, filepath.Join(libDir, "2024", "Apple (image)", "2024-08-20",
 		"2024-08-20_18-45-03_a1b2c3d4.jpg"), "data")
 
 	result, err := Run(Options{LibraryPath: libDir, FailFast: true}, newTestLogger())
@@ -67,7 +67,7 @@ func TestRun_AlreadyLowercaseSkipped(t *testing.T) {
 
 func TestRun_SidecarUppercase(t *testing.T) {
 	libDir := t.TempDir()
-	dir := filepath.Join(libDir, "2024", "sources", "Apple (image)", "2024-08-20")
+	dir := filepath.Join(libDir, "2024", "Apple (image)", "2024-08-20")
 	createFile(t, filepath.Join(dir, "2024-08-20_18-45-03_a1b2c3d4.jpg"), "primary")
 	createFile(t, filepath.Join(dir, "2024-08-20_18-45-03_a1b2c3d4.XMP"), "sidecar")
 
@@ -82,7 +82,7 @@ func TestRun_SidecarUppercase(t *testing.T) {
 
 func TestRun_DryRun(t *testing.T) {
 	libDir := t.TempDir()
-	src := filepath.Join(libDir, "2024", "sources", "Apple (image)", "2024-08-20",
+	src := filepath.Join(libDir, "2024", "Apple (image)", "2024-08-20",
 		"2024-08-20_18-45-03_a1b2c3d4.JPG")
 	createFile(t, src, "data")
 
@@ -103,9 +103,9 @@ func TestRun_DryRun(t *testing.T) {
 
 func TestRun_YearFilter(t *testing.T) {
 	libDir := t.TempDir()
-	createFile(t, filepath.Join(libDir, "2023", "sources", "A (image)", "2023-01-01",
+	createFile(t, filepath.Join(libDir, "2023", "A (image)", "2023-01-01",
 		"2023-01-01_00-00-00_aaaaaaaa.JPG"), "old")
-	createFile(t, filepath.Join(libDir, "2024", "sources", "A (image)", "2024-01-01",
+	createFile(t, filepath.Join(libDir, "2024", "A (image)", "2024-01-01",
 		"2024-01-01_00-00-00_bbbbbbbb.JPG"), "new")
 
 	result, err := Run(Options{LibraryPath: libDir, YearFilter: "2024", FailFast: true}, newTestLogger())
@@ -114,7 +114,7 @@ func TestRun_YearFilter(t *testing.T) {
 
 	// 2023 untouched (only on case-sensitive FS can we observe this).
 	if caseSensitive(t) {
-		_, err = os.Stat(filepath.Join(libDir, "2023", "sources", "A (image)", "2023-01-01",
+		_, err = os.Stat(filepath.Join(libDir, "2023", "A (image)", "2023-01-01",
 			"2023-01-01_00-00-00_aaaaaaaa.JPG"))
 		assert.NoError(t, err, "2023 file should be untouched under YearFilter=2024")
 	}
@@ -122,9 +122,9 @@ func TestRun_YearFilter(t *testing.T) {
 
 func TestRun_MultipleYears(t *testing.T) {
 	libDir := t.TempDir()
-	createFile(t, filepath.Join(libDir, "2023", "sources", "A (image)", "2023-01-01",
+	createFile(t, filepath.Join(libDir, "2023", "A (image)", "2023-01-01",
 		"2023-01-01_00-00-00_aaaaaaaa.JPG"), "y23")
-	createFile(t, filepath.Join(libDir, "2024", "sources", "A (image)", "2024-01-01",
+	createFile(t, filepath.Join(libDir, "2024", "A (image)", "2024-01-01",
 		"2024-01-01_00-00-00_bbbbbbbb.JPG"), "y24")
 
 	result, err := Run(Options{LibraryPath: libDir, FailFast: true}, newTestLogger())
@@ -134,7 +134,7 @@ func TestRun_MultipleYears(t *testing.T) {
 
 func TestRun_OSJunkIgnored(t *testing.T) {
 	libDir := t.TempDir()
-	dir := filepath.Join(libDir, "2024", "sources", "A (image)", "2024-01-01")
+	dir := filepath.Join(libDir, "2024", "A (image)", "2024-01-01")
 	createFile(t, filepath.Join(dir, ".DS_Store"), "junk")
 	createFile(t, filepath.Join(dir, "2024-01-01_00-00-00_aaaaaaaa.jpg"), "valid")
 
@@ -145,29 +145,31 @@ func TestRun_OSJunkIgnored(t *testing.T) {
 	assert.Equal(t, 1, result.AlreadyOK)
 }
 
-func TestRun_FreeformDirsUntouched(t *testing.T) {
+func TestRun_OnlyDeviceDirsTouched(t *testing.T) {
 	libDir := t.TempDir()
 
-	// sources/ has uppercase ext — should be renamed.
-	createFile(t, filepath.Join(libDir, "2024", "sources", "A (image)", "2024-01-01",
+	// A device dir has an uppercase ext — should be renamed.
+	createFile(t, filepath.Join(libDir, "2024", "A (image)", "2024-01-01",
 		"2024-01-01_00-00-00_aaaaaaaa.JPG"), "primary")
 
-	// Sibling freeform dirs have uppercase exts — must remain untouched.
-	createFile(t, filepath.Join(libDir, "2024", "sources-manual", "old-phone", "IMG.JPG"), "manual")
-	createFile(t, filepath.Join(libDir, "2024", "processed", "edits", "EDIT.PNG"), "edited")
-	createFile(t, filepath.Join(libDir, "undated", "scan.JPG"), "undated")
+	// Hidden dirs and loose files outside device dirs are not source files.
+	createFile(t, filepath.Join(libDir, "2024", ".imv", "NOTE.TXT"), "cache dir")
+	createFile(t, filepath.Join(libDir, "2024", "STRAY.JPG"), "loose in year")
+	createFile(t, filepath.Join(libDir, "ROOT.JPG"), "loose in root")
 
 	result, err := Run(Options{LibraryPath: libDir, FailFast: true}, newTestLogger())
 	require.NoError(t, err)
-	assert.Equal(t, 1, result.Renamed, "only the file under sources/ should be renamed")
+	assert.Equal(t, 1, result.Renamed, "only the file inside a device dir should be renamed")
 
 	if caseSensitive(t) {
-		_, err = os.Stat(filepath.Join(libDir, "2024", "sources-manual", "old-phone", "IMG.JPG"))
-		assert.NoError(t, err, "sources-manual untouched")
-		_, err = os.Stat(filepath.Join(libDir, "2024", "processed", "edits", "EDIT.PNG"))
-		assert.NoError(t, err, "processed untouched")
-		_, err = os.Stat(filepath.Join(libDir, "undated", "scan.JPG"))
-		assert.NoError(t, err, "undated untouched")
+		for _, p := range []string{
+			filepath.Join(libDir, "2024", ".imv", "NOTE.TXT"),
+			filepath.Join(libDir, "2024", "STRAY.JPG"),
+			filepath.Join(libDir, "ROOT.JPG"),
+		} {
+			_, err = os.Stat(p)
+			assert.NoError(t, err, "%s untouched", p)
+		}
 	}
 }
 
@@ -176,7 +178,7 @@ func TestRun_ConflictDifferentContent(t *testing.T) {
 		t.Skip("conflict-by-different-content requires a case-sensitive filesystem")
 	}
 	libDir := t.TempDir()
-	dir := filepath.Join(libDir, "2024", "sources", "A (image)", "2024-01-01")
+	dir := filepath.Join(libDir, "2024", "A (image)", "2024-01-01")
 	createFile(t, filepath.Join(dir, "2024-01-01_00-00-00_aaaaaaaa.JPG"), "upper")
 	createFile(t, filepath.Join(dir, "2024-01-01_00-00-00_aaaaaaaa.jpg"), "lower")
 
@@ -199,7 +201,7 @@ func TestRun_ConflictFailFast(t *testing.T) {
 		t.Skip("conflict-by-different-content requires a case-sensitive filesystem")
 	}
 	libDir := t.TempDir()
-	dir := filepath.Join(libDir, "2024", "sources", "A (image)", "2024-01-01")
+	dir := filepath.Join(libDir, "2024", "A (image)", "2024-01-01")
 	createFile(t, filepath.Join(dir, "2024-01-01_00-00-00_aaaaaaaa.JPG"), "upper")
 	createFile(t, filepath.Join(dir, "2024-01-01_00-00-00_aaaaaaaa.jpg"), "lower")
 

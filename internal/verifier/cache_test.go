@@ -48,22 +48,22 @@ func TestCacheLoad_ValidRecords(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cache")
 	content := "# header\n" +
-		"sources/Dev (image)/2024-01-15/a.jpg\t100\t1700000000000000000\tmd5\t1700000100\n" +
-		"sources/Dev (image)/2024-01-15/b.jpg\t200\t1700000000000000001\tsha256\t1700000200\n"
+		"Dev (image)/2024-01-15/a.jpg\t100\t1700000000000000000\tmd5\t1700000100\n" +
+		"Dev (image)/2024-01-15/b.jpg\t200\t1700000000000000001\tsha256\t1700000200\n"
 	writeCacheFile(t, path, content)
 
 	c, err := Load(path)
 	require.NoError(t, err)
 	assert.Len(t, c.Entries(), 2)
 
-	a, ok := c.Lookup("sources/Dev (image)/2024-01-15/a.jpg")
+	a, ok := c.Lookup("Dev (image)/2024-01-15/a.jpg")
 	require.True(t, ok)
 	assert.Equal(t, int64(100), a.Size)
 	assert.Equal(t, int64(1700000000000000000), a.MtimeNs)
 	assert.Equal(t, "md5", a.HashAlgo)
 	assert.Equal(t, int64(1700000100), a.VerifiedAt)
 
-	b, ok := c.Lookup("sources/Dev (image)/2024-01-15/b.jpg")
+	b, ok := c.Lookup("Dev (image)/2024-01-15/b.jpg")
 	require.True(t, ok)
 	assert.Equal(t, "sha256", b.HashAlgo)
 }

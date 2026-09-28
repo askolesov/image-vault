@@ -17,7 +17,7 @@ type Options struct {
 }
 
 // BuildSourcePath computes the full relative path for a source file.
-// Format: <year>/sources/<device dir>/<date>/<datetime_hash.ext>
+// Format: <year>/<device dir>/<date>/<datetime_hash.ext>
 func BuildSourcePath(fm *metadata.FileMetadata, opts Options) string {
 	year := fm.DateTime.Format("2006")
 	mt := effectiveMediaType(fm.MediaType, opts)
@@ -25,7 +25,7 @@ func BuildSourcePath(fm *metadata.FileMetadata, opts Options) string {
 	dateDir := fm.DateTime.Format("2006-01-02")
 	filename := BuildSourceFilename(fm.DateTime, fm.ShortHash, fm.Extension)
 
-	return filepath.ToSlash(filepath.Join(year, "sources", device, dateDir, filename))
+	return filepath.ToSlash(filepath.Join(year, device, dateDir, filename))
 }
 
 // BuildSidecarPath replaces the extension of primaryPath with sidecarExt.
@@ -42,13 +42,10 @@ func BuildSourceFilename(dt time.Time, shortHash string, ext string) string {
 	return dt.Format("2006-01-02_15-04-05") + "_" + shortHash + ext
 }
 
-// DeviceDir builds a device directory name.
-// Format: "<Make> <Model> (<type>)" or "<Make> (<type>)" when model is empty.
+// DeviceDir builds a device directory name: "<canonical device name> (<type>)".
+// See defaults.DeviceName for the naming rules.
 func DeviceDir(make_, model string, mediaType defaults.MediaType) string {
-	if model == "" {
-		return fmt.Sprintf("%s (%s)", make_, mediaType)
-	}
-	return fmt.Sprintf("%s %s (%s)", make_, model, mediaType)
+	return fmt.Sprintf("%s (%s)", defaults.DeviceName(make_, model), mediaType)
 }
 
 // effectiveMediaType returns the effective media type, mapping video to photo

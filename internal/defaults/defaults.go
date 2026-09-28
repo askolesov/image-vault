@@ -123,27 +123,78 @@ func MediaTypeFromMIME(mime string) MediaType {
 	}
 }
 
-
-// MakeNormalization maps raw camera make strings to normalized values.
-var MakeNormalization = map[string]string{}
-
-// ModelNormalization maps raw camera model strings to normalized values.
-var ModelNormalization = map[string]string{}
-
-// NormalizeMake returns the normalized camera make, or the original value if not in the map.
-func NormalizeMake(make string) string {
-	if v, ok := MakeNormalization[make]; ok {
-		return v
-	}
-	return make
+// makeAliases maps a raw EXIF make, lowercased, to its canonical spelling.
+// Makes not listed here are kept as written.
+var makeAliases = map[string]string{
+	"apple":                   "Apple",
+	"canon":                   "Canon",
+	"dji":                     "DJI",
+	"fujifilm":                "Fujifilm",
+	"google":                  "Google",
+	"gopro":                   "GoPro",
+	"huawei":                  "Huawei",
+	"nikon":                   "Nikon",
+	"nikon corporation":       "Nikon",
+	"olympus":                 "Olympus",
+	"olympus corporation":     "Olympus",
+	"olympus imaging corp.":   "Olympus",
+	"olympus optical co.,ltd": "Olympus",
+	"panasonic":               "Panasonic",
+	"samsung":                 "Samsung",
+	"sony":                    "Sony",
+	"xiaomi":                  "Xiaomi",
 }
 
-// NormalizeModel returns the normalized camera model, or the original value if not in the map.
-func NormalizeModel(model string) string {
-	if v, ok := ModelNormalization[model]; ok {
-		return v
+// marketNames maps "<canonical make> <model>" to the model's market name,
+// for cameras whose EXIF model is a code.
+var marketNames = map[string]string{
+	"DJI FC2103":     "Mavic Air",
+	"Sony ILCE-6300": "a6300",
+}
+
+// DeviceName returns the canonical "<Make> <Model>" name of a camera, used as
+// the device directory name. It is a pure function of the EXIF make and
+// model, so a vault path stays rebuildable from EXIF alone:
+//
+//  1. canonical make spelling (SONY → Sony, NIKON CORPORATION → Nikon);
+//  2. no make (or "Unknown") but the model starts with a known make → take it;
+//  3. a model that repeats its make loses the repeat (Canon + "Canon EOS 5D");
+//  4. market names for model codes (Sony ILCE-6300 → a6300);
+//  5. still no make → "Unknown".
+func DeviceName(make_, model string) string {
+	make_ = strings.TrimSpace(make_)
+	model = strings.TrimSpace(model)
+
+	if canon, ok := makeAliases[strings.ToLower(make_)]; ok {
+		make_ = canon
 	}
-	return model
+
+	if make_ == "" || make_ == "Unknown" {
+		first, rest, _ := strings.Cut(model, " ")
+		if canon, ok := makeAliases[strings.ToLower(first)]; ok {
+			make_, model = canon, strings.TrimSpace(rest)
+		}
+	}
+
+	if make_ != "" && len(model) >= len(make_) && strings.EqualFold(model[:len(make_)], make_) {
+		if len(model) == len(make_) {
+			model = ""
+		} else if model[len(make_)] == ' ' {
+			model = strings.TrimSpace(model[len(make_):])
+		}
+	}
+
+	if make_ == "" {
+		make_ = "Unknown"
+	}
+	if market, ok := marketNames[make_+" "+model]; ok {
+		model = market
+	}
+
+	if model == "" {
+		return make_
+	}
+	return make_ + " " + model
 }
 
 // DefaultHashAlgorithm is the default hash algorithm used for file hashing.

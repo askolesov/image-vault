@@ -99,13 +99,8 @@ func (v *Verifier) Verify() (*Result, error) {
 	for i, year := range years {
 		yearDir := filepath.Join(v.cfg.LibraryPath, year)
 
-		// Validate year level — only sources/, processed/, sources-manual/, .imv/ allowed
-		if err := v.verifyYearLevel(yearDir, year, result); err != nil {
-			return result, err
-		}
-
-		// Validate sources structure (device dirs, date dirs)
-		if err := v.verifySourcesStructure(yearDir, year, result); err != nil {
+		// Validate year structure — only device dirs (with date dirs) and .imv/
+		if err := v.verifyYearStructure(yearDir, year, result); err != nil {
 			return result, err
 		}
 
@@ -202,7 +197,7 @@ func (v *Verifier) openYearCache(yearDir, year string, entries []FileEntry) *Cac
 	return c
 }
 
-// verifySourceFiles checks each file in sources/ for correct path and hash.
+// verifySourceFiles checks each source file of a year for correct path and hash.
 // Consumes pre-walked entries; no internal walk or stat.
 func (v *Verifier) verifySourceFiles(
 	year string,
@@ -257,8 +252,8 @@ func (v *Verifier) verifySourceFiles(
 		// Structural consistency: filename date must match date dir,
 		// date dir year must match year level
 		parts := strings.Split(fe.RelToYear, "/")
-		// fe.RelToYear is like: "sources/Device (image)/2024-08-20/<file>"
-		if len(parts) >= 4 && parts[0] == "sources" {
+		// fe.RelToYear is like: "Device (image)/2024-08-20/<file>"
+		if len(parts) >= 3 {
 			dateDir := parts[len(parts)-2]
 
 			// A date dir must start with YYYY matching the year level. A
@@ -372,8 +367,7 @@ func (v *Verifier) verifySourceFiles(
 	return nil
 }
 
-// verifyLibraryRoot checks that the library root contains only year directories
-// and the optional freeform "undated" directory.
+// verifyLibraryRoot checks that the library root contains only year directories.
 func (v *Verifier) verifyLibraryRoot(result *Result) error {
 	entries, err := os.ReadDir(v.cfg.LibraryPath)
 	if err != nil {
@@ -392,7 +386,7 @@ func (v *Verifier) verifyLibraryRoot(result *Result) error {
 			}
 			continue
 		}
-		if library.IsYearDir(e.Name()) || e.Name() == "undated" {
+		if library.IsYearDir(e.Name()) {
 			continue
 		}
 		result.Inconsistent++
@@ -405,23 +399,16 @@ func (v *Verifier) verifyLibraryRoot(result *Result) error {
 	return nil
 }
 
-// verifyYearLevel checks that a year directory contains only sources/, processed/,
-// sources-manual/, and .imv/.
-func (v *Verifier) verifyYearLevel(yearDir, year string, result *Result) error {
+// verifyYearStructure validates the hierarchy of a year directory:
+// <year>/<device dir>/<date dir>/ plus the .imv/ cache dir — nothing else.
+func (v *Verifier) verifyYearStructure(yearDir, year string, result *Result) error {
 	entries, err := os.ReadDir(yearDir)
 	if err != nil {
 		return fmt.Errorf("read year dir %s: %w", year, err)
 	}
 
-	allowed := map[string]bool{
-		"sources":        true,
-		"processed":      true,
-		"sources-manual": true,
-		cacheDirName:     true,
-	}
-
 	for _, e := range entries {
-		if isSkippableInLibrary(e.Name()) {
+		if isSkippableInLibrary(e.Name()) || e.Name() == cacheDirName {
 			continue
 		}
 		if !e.IsDir() {
@@ -432,47 +419,11 @@ func (v *Verifier) verifyYearLevel(yearDir, year string, result *Result) error {
 			}
 			continue
 		}
-		if !allowed[e.Name()] {
-			result.Inconsistent++
-			v.logger.Warn("unexpected directory in %s/: %s (expected sources/ or processed/)", year, e.Name())
-			if v.cfg.FailFast {
-				return fmt.Errorf("unexpected directory in %s/: %s", year, e.Name())
-			}
-		}
-	}
-
-	return nil
-}
-
-// verifySourcesStructure validates the directory hierarchy inside sources/:
-// sources/<device dir>/<date dir>/ — no unexpected entries at any level.
-func (v *Verifier) verifySourcesStructure(yearDir, year string, result *Result) error {
-	sourcesDir := filepath.Join(yearDir, "sources")
-	entries, err := os.ReadDir(sourcesDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("read sources dir for %s: %w", year, err)
-	}
-
-	for _, e := range entries {
-		if isSkippableInLibrary(e.Name()) {
-			continue
-		}
-		if !e.IsDir() {
-			result.Inconsistent++
-			v.logger.Warn("unexpected file in %s/sources/: %s", year, e.Name())
-			if v.cfg.FailFast {
-				return fmt.Errorf("unexpected file in %s/sources/: %s", year, e.Name())
-			}
-			continue
-		}
 
 		// Validate device dir name
 		if err := pathbuilder.ValidateDeviceDir(e.Name()); err != nil {
 			result.Inconsistent++
-			v.logger.Warn("invalid device directory in %s/sources/: %s (%v)", year, e.Name(), err)
+			v.logger.Warn("unexpected directory in %s/: %s (%v)", year, e.Name(), err)
 			if v.cfg.FailFast {
 				return fmt.Errorf("invalid device directory: %s", e.Name())
 			}
@@ -480,7 +431,7 @@ func (v *Verifier) verifySourcesStructure(yearDir, year string, result *Result) 
 		}
 
 		// Check inside device dir — only date dirs allowed
-		deviceDir := filepath.Join(sourcesDir, e.Name())
+		deviceDir := filepath.Join(yearDir, e.Name())
 		if err := v.verifyDeviceDir(deviceDir, year, e.Name(), result); err != nil {
 			return err
 		}
@@ -502,15 +453,15 @@ func (v *Verifier) verifyDeviceDir(deviceDir, year, deviceName string, result *R
 		}
 		if !e.IsDir() {
 			result.Inconsistent++
-			v.logger.Warn("unexpected file in %s/sources/%s/: %s", year, deviceName, e.Name())
+			v.logger.Warn("unexpected file in %s/%s/: %s", year, deviceName, e.Name())
 			if v.cfg.FailFast {
-				return fmt.Errorf("unexpected file in %s/sources/%s/: %s", year, deviceName, e.Name())
+				return fmt.Errorf("unexpected file in %s/%s/: %s", year, deviceName, e.Name())
 			}
 			continue
 		}
 		if err := pathbuilder.ValidateDateDir(e.Name()); err != nil {
 			result.Inconsistent++
-			v.logger.Warn("invalid date directory in %s/sources/%s/: %s (%v)", year, deviceName, e.Name(), err)
+			v.logger.Warn("invalid date directory in %s/%s/: %s (%v)", year, deviceName, e.Name(), err)
 			if v.cfg.FailFast {
 				return fmt.Errorf("invalid date directory: %s", e.Name())
 			}
