@@ -149,6 +149,7 @@ var makeAliases = map[string]string{
 // for cameras whose EXIF model is a code.
 var marketNames = map[string]string{
 	"DJI FC2103":     "Mavic Air",
+	"DJI OP-041":     "OsmoPocket4",
 	"Sony ILCE-6300": "a6300",
 }
 
