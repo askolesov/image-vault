@@ -8,5 +8,6 @@ func newLibToolsCmd() *cobra.Command {
 		Short: "Library-aware maintenance commands",
 	}
 	cmd.AddCommand(newLibToolsNormalizeExtCmd())
+	cmd.AddCommand(newLibToolsMigrateLayoutCmd())
 	return cmd
 }

@@ -1,4 +1,4 @@
-// Package extnormalize walks a library's <year>/sources/ subtrees and
+// Package extnormalize walks a library's <year>/<device>/ subtrees and
 // renames any file whose extension is not already lowercase. Pure case
 // fixup — no hashing, no exiftool, no path rebuild.
 package extnormalize
@@ -31,7 +31,7 @@ type Result struct {
 	Errors    int
 }
 
-// Run walks <LibraryPath>/<year>/sources/ for each year matching YearFilter
+// Run walks <LibraryPath>/<year>/<device>/ for each year matching YearFilter
 // (or all years when YearFilter is empty) and lowercases any non-lowercase
 // extension. Returns a non-nil Result even on error so callers can report
 // partial progress.

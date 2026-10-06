@@ -70,32 +70,15 @@ func TestListYearsFilteredNotFound(t *testing.T) {
 
 func TestListSourceFiles(t *testing.T) {
 	dir := t.TempDir()
-	makeFile(t, dir, "sources/iphone/2024-01-01/img1.jpg", "data")
-	makeFile(t, dir, "sources/iphone/2024-01-01/img2.jpg", "data")
-	makeFile(t, dir, "sources/canon/2024-02-15/img3.cr2", "data")
+	makeFile(t, dir, "Apple iPhone 13 (image)/2024-01-01/img1.jpg", "data")
+	makeFile(t, dir, "Apple iPhone 13 (image)/2024-01-01/img2.jpg", "data")
+	makeFile(t, dir, "Canon EOS 5D (image)/2024-02-15/img3.cr2", "data")
+	makeFile(t, dir, ".imv/verify.cache", "# cache")
+	makeFile(t, dir, "stray.txt", "data")
 
 	files, err := ListSourceFiles(dir, ListSourceFilesProgress{})
 	require.NoError(t, err)
-	assert.Len(t, files, 3)
-}
-
-func TestListProcessedDirs(t *testing.T) {
-	dir := t.TempDir()
-	makeDir(t, dir, "processed/photo")
-	makeDir(t, dir, "processed/video")
-	makeFile(t, dir, "processed/stray.txt", "data")
-
-	dirs, err := ListProcessedDirs(dir)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"photo", "video"}, dirs)
-}
-
-func TestListProcessedDirsNoProcessedDir(t *testing.T) {
-	dir := t.TempDir()
-
-	dirs, err := ListProcessedDirs(dir)
-	require.NoError(t, err)
-	assert.Empty(t, dirs)
+	assert.Len(t, files, 3, "files under hidden dirs such as .imv/ and loose files in the year dir are not source files")
 }
 
 func TestRemoveEmptyDirs(t *testing.T) {
@@ -146,20 +129,20 @@ func TestListYearsFilteredNotADir(t *testing.T) {
 	assert.Contains(t, err.Error(), "not a directory")
 }
 
-func TestListSourceFilesNoSourcesDir(t *testing.T) {
+func TestListSourceFilesNoYearDir(t *testing.T) {
 	dir := t.TempDir()
-	// No sources/ directory at all
-	files, err := ListSourceFiles(dir, ListSourceFilesProgress{})
+	// The year directory does not exist
+	files, err := ListSourceFiles(filepath.Join(dir, "2024"), ListSourceFilesProgress{})
 	require.NoError(t, err)
 	assert.Nil(t, files)
 }
 
-func TestListSourceFilesSourcesIsFile(t *testing.T) {
+func TestListSourceFilesYearIsFile(t *testing.T) {
 	dir := t.TempDir()
-	// sources is a file, not a directory
-	makeFile(t, dir, "sources", "not a directory")
+	// the year path is a file, not a directory
+	makeFile(t, dir, "2024", "not a directory")
 
-	files, err := ListSourceFiles(dir, ListSourceFilesProgress{})
+	files, err := ListSourceFiles(filepath.Join(dir, "2024"), ListSourceFilesProgress{})
 	require.NoError(t, err)
 	assert.Nil(t, files)
 }
@@ -213,14 +196,13 @@ func TestListSourceFilesPermissionError(t *testing.T) {
 		t.Skip("skipping permission test as root")
 	}
 	dir := t.TempDir()
-	sourcesDir := filepath.Join(dir, "sources")
-	require.NoError(t, os.MkdirAll(filepath.Join(sourcesDir, "restricted"), 0o755))
-	makeFile(t, dir, "sources/restricted/file.jpg", "data")
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "restricted"), 0o755))
+	makeFile(t, dir, "restricted/file.jpg", "data")
 
 	// Make the restricted dir unreadable
-	require.NoError(t, os.Chmod(filepath.Join(sourcesDir, "restricted"), 0o000))
+	require.NoError(t, os.Chmod(filepath.Join(dir, "restricted"), 0o000))
 	t.Cleanup(func() {
-		_ = os.Chmod(filepath.Join(sourcesDir, "restricted"), 0o755)
+		_ = os.Chmod(filepath.Join(dir, "restricted"), 0o755)
 	})
 
 	// Should skip permission errors gracefully
@@ -286,21 +268,6 @@ func TestIsDirEffectivelyEmptyOnlyOSFiles(t *testing.T) {
 	assert.True(t, empty)
 }
 
-func TestListProcessedDirsError(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("skipping permission test as root")
-	}
-	dir := t.TempDir()
-	processedDir := filepath.Join(dir, "processed")
-	require.NoError(t, os.MkdirAll(processedDir, 0o000))
-	t.Cleanup(func() {
-		_ = os.Chmod(processedDir, 0o755)
-	})
-
-	_, err := ListProcessedDirs(dir)
-	assert.Error(t, err)
-}
-
 func TestRemoveEmptyDirsPermissionError(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("skipping permission test as root")
@@ -323,9 +290,9 @@ func TestRemoveEmptyDirsPermissionError(t *testing.T) {
 
 func TestListSourceFilesProgress(t *testing.T) {
 	dir := t.TempDir()
-	makeFile(t, dir, "sources/iphone/2024-01-01/img1.jpg", "data")
-	makeFile(t, dir, "sources/iphone/2024-01-01/img2.jpg", "data")
-	makeFile(t, dir, "sources/canon/2024-02-15/img3.cr2", "data")
+	makeFile(t, dir, "Apple iPhone 13 (image)/2024-01-01/img1.jpg", "data")
+	makeFile(t, dir, "Apple iPhone 13 (image)/2024-01-01/img2.jpg", "data")
+	makeFile(t, dir, "Canon EOS 5D (image)/2024-02-15/img3.cr2", "data")
 
 	type call struct{ dirs, files int }
 	var calls []call
@@ -340,12 +307,12 @@ func TestListSourceFilesProgress(t *testing.T) {
 
 	final := calls[len(calls)-1]
 	assert.Equal(t, 3, final.files, "final tally should report all 3 files")
-	assert.GreaterOrEqual(t, final.dirs, 1, "final tally should count at least the sources dir")
+	assert.GreaterOrEqual(t, final.dirs, 1, "final tally should count at least the year dir")
 }
 
 func TestListSourceFilesNilProgress(t *testing.T) {
 	dir := t.TempDir()
-	makeFile(t, dir, "sources/iphone/2024-01-01/img1.jpg", "data")
+	makeFile(t, dir, "Apple iPhone 13 (image)/2024-01-01/img1.jpg", "data")
 
 	files, err := ListSourceFiles(dir, ListSourceFilesProgress{})
 	require.NoError(t, err)
@@ -357,17 +324,17 @@ func TestListSourceFilesStatError(t *testing.T) {
 		t.Skip("skipping permission test as root")
 	}
 	dir := t.TempDir()
-	// Create sources as a directory but make the parent unreadable for stat
-	sourcesDir := filepath.Join(dir, "sources")
-	require.NoError(t, os.MkdirAll(sourcesDir, 0o755))
-	makeFile(t, dir, "sources/file.jpg", "data")
+	// Create the year dir but make the parent unreadable for stat
+	yearDir := filepath.Join(dir, "2024")
+	require.NoError(t, os.MkdirAll(yearDir, 0o755))
+	makeFile(t, dir, "2024/file.jpg", "data")
 
-	// Make parent dir unreadable to prevent stat on sources
+	// Make parent dir unreadable to prevent stat on the year dir
 	require.NoError(t, os.Chmod(dir, 0o000))
 	t.Cleanup(func() {
 		_ = os.Chmod(dir, 0o755)
 	})
 
-	_, err := ListSourceFiles(dir, ListSourceFilesProgress{})
+	_, err := ListSourceFiles(yearDir, ListSourceFilesProgress{})
 	assert.Error(t, err)
 }

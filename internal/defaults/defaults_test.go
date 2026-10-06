@@ -1,6 +1,7 @@
 package defaults
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,18 +84,41 @@ func TestMediaTypeFromMIME(t *testing.T) {
 	}
 }
 
-func TestNormalizeMake(t *testing.T) {
-	// With empty maps, should passthrough
-	assert.Equal(t, "Canon", NormalizeMake("Canon"))
-	assert.Equal(t, "Sony", NormalizeMake("Sony"))
-	assert.Equal(t, "", NormalizeMake(""))
+func TestDeviceName(t *testing.T) {
+	tests := []struct {
+		name, make_, model, want string
+	}{
+		{"make repeated in model", "Canon", "Canon EOS 5D", "Canon EOS 5D"},
+		{"make repeated, mark", "Canon", "Canon EOS 5D Mark IV", "Canon EOS 5D Mark IV"},
+		{"upper-case make", "SONY", "ILCE-6300", "Sony a6300"},
+		{"proper-case make, market name", "Sony", "ILCE-6300", "Sony a6300"},
+		{"make from model when unknown", "Unknown", "Canon EOS 550D", "Canon EOS 550D"},
+		{"make from model when empty", "", "Canon EOS 550D", "Canon EOS 550D"},
+		{"dji code to market name", "DJI", "FC2103", "DJI Mavic Air"},
+		{"osmo pocket 4 code to market name", "DJI", "OP-041", "DJI OsmoPocket4"},
+		{"apple unchanged", "Apple", "iPhone 13", "Apple iPhone 13"},
+		{"multi-word make alias", "NIKON CORPORATION", "NIKON D70", "Nikon D70"},
+		{"unknown make kept as written", "Acme Cam", "X1", "Acme Cam X1"},
+		{"make only", "DJI", "", "DJI"},
+		{"nothing", "", "", "Unknown"},
+		{"unknown with unknown model", "Unknown", "Mystery 3000", "Unknown Mystery 3000"},
+		{"whitespace trimmed", "  Canon ", " Canon EOS 60D ", "Canon EOS 60D"},
+		{"model equals make", "Canon", "Canon", "Canon"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, DeviceName(tt.make_, tt.model))
+		})
+	}
 }
 
-func TestNormalizeModel(t *testing.T) {
-	// With empty maps, should passthrough
-	assert.Equal(t, "EOS R5", NormalizeModel("EOS R5"))
-	assert.Equal(t, "A7III", NormalizeModel("A7III"))
-	assert.Equal(t, "", NormalizeModel(""))
+func TestDeviceNameIdempotent(t *testing.T) {
+	// A canonical name split back into first word + rest maps to itself —
+	// migrate-layout relies on this to leave already-canonical dirs alone.
+	for _, name := range []string{"Canon EOS 5D", "Sony a6300", "DJI Mavic Air", "Apple iPhone 13", "Unknown", "DJI"} {
+		mk, model, _ := strings.Cut(name, " ")
+		assert.Equal(t, name, DeviceName(mk, model), name)
+	}
 }
 
 func TestNewHasher(t *testing.T) {

@@ -79,8 +79,8 @@ func TestImportSingleFile(t *testing.T) {
 	assert.Equal(t, 0, result.Skipped)
 	assert.Equal(t, 0, result.Errors)
 
-	// Verify file landed in correct structure: <year>/sources/<device>/<date>/<filename>
-	matches, _ := filepath.Glob(filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", "*.jpg"))
+	// Verify file landed in correct structure: <year>/<device>/<date>/<filename>
+	matches, _ := filepath.Glob(filepath.Join(libDir, "2024", "TestMake TestModel (image)", "2024-01-15", "*.jpg"))
 	assert.Len(t, matches, 1)
 }
 
@@ -220,7 +220,7 @@ func TestImportWithSidecars(t *testing.T) {
 	assert.Equal(t, 1, result.Imported)
 
 	// Verify sidecar placed next to primary
-	matches, _ := filepath.Glob(filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", "*.xmp"))
+	matches, _ := filepath.Glob(filepath.Join(libDir, "2024", "TestMake TestModel (image)", "2024-01-15", "*.xmp"))
 	assert.Len(t, matches, 1)
 }
 
@@ -246,11 +246,11 @@ func TestImportLowercasesUppercaseSidecarExt(t *testing.T) {
 	assert.Equal(t, 1, result.Imported)
 
 	// Lowercase sidecar must exist.
-	lowerMatches, _ := filepath.Glob(filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15", "*.xmp"))
+	lowerMatches, _ := filepath.Glob(filepath.Join(libDir, "2024", "TestMake TestModel (image)", "2024-01-15", "*.xmp"))
 	assert.Len(t, lowerMatches, 1, "sidecar must land at .xmp")
 
 	// No file in the target dir should retain the uppercase extension.
-	allFiles, err := os.ReadDir(filepath.Join(libDir, "2024", "sources", "TestMake TestModel (image)", "2024-01-15"))
+	allFiles, err := os.ReadDir(filepath.Join(libDir, "2024", "TestMake TestModel (image)", "2024-01-15"))
 	require.NoError(t, err)
 	for _, f := range allFiles {
 		ext := filepath.Ext(f.Name())
@@ -401,7 +401,7 @@ func TestImportYearFilter(t *testing.T) {
 	assert.Equal(t, 1, result.Skipped)
 
 	// Only 2025 directory should exist
-	matches, _ := filepath.Glob(filepath.Join(libDir, "2025", "sources", "*", "*", "*.jpg"))
+	matches, _ := filepath.Glob(filepath.Join(libDir, "2025", "*", "*", "*.jpg"))
 	assert.Len(t, matches, 1)
 	matches, _ = filepath.Glob(filepath.Join(libDir, "2024", "**"))
 	assert.Empty(t, matches)
@@ -509,4 +509,45 @@ func TestLinkSidecarsSameBase(t *testing.T) {
 		totalPaths += len(g.Sidecars)
 	}
 	assert.Equal(t, 2, totalPaths)
+}
+
+// TestImportNoDateLeftInPlace: a file whose EXIF gives no date is not
+// imported (the vault holds only EXIF-filed media) — it is counted as NoDate
+// and stays where it was, even under --move.
+func TestImportNoDateLeftInPlace(t *testing.T) {
+	srcDir := t.TempDir()
+	libDir := t.TempDir()
+
+	dated := filepath.Join(srcDir, "dated.jpg")
+	undated := filepath.Join(srcDir, "undated.jpg")
+	createTestFile(t, dated, "dated content")
+	createTestFile(t, undated, "undated content")
+
+	hasher := mustHasher("md5")
+	full, short, err := metadata.ComputeFileHash(undated, hasher)
+	require.NoError(t, err)
+	ext := &fakeExtractor{results: map[string]*metadata.FileMetadata{
+		undated: {
+			Path:      undated,
+			Extension: ".jpg",
+			Make:      "TestMake",
+			Model:     "TestModel",
+			MIMEType:  "image/jpeg",
+			MediaType: defaults.MediaTypePhoto,
+			FullHash:  full,
+			ShortHash: short,
+		},
+	}}
+
+	imp, err := New(Config{LibraryPath: libDir, HashAlgo: "md5", Move: true}, ext, newTestLogger())
+	require.NoError(t, err)
+	result, err := imp.ImportDir(srcDir)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, result.Imported)
+	assert.Equal(t, 1, result.NoDate)
+	_, err = os.Stat(undated)
+	assert.NoError(t, err, "a file without a date stays in the source dir")
+	matches, _ := filepath.Glob(filepath.Join(libDir, "0001", "*"))
+	assert.Empty(t, matches, "nothing is filed under year 0001")
 }

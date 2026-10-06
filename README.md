@@ -29,38 +29,47 @@ sudo apt install libimage-exiftool-perl  # Linux
 
 ## Library Structure
 
-No config files — the library is defined by its directory layout:
+No config files — the library is defined by its directory layout, and holds only
+what can be filed from EXIF. Everything else (exports, screenshots, files with no
+date) belongs outside the vault.
 
 ```
 ~/Photos/
   2024/
-    sources/
-      Apple iPhone 15 Pro (image)/
-        2024-08-20/
-          2024-08-20_18-45-03_a1b2c3d4.jpg
-          2024-08-20_18-45-03_a1b2c3d4.xmp   # sidecar
-      Apple iPhone 15 Pro (video)/
-        2024-12-25/
-          2024-12-25_10-00-15_e5f6g7h8.mp4
-    sources-manual/   # freeform, not validated
-    processed/        # freeform, not validated
+    .imv/verify.cache
+    Apple iPhone 15 Pro (image)/
+      2024-08-20/
+        2024-08-20_18-45-03_a1b2c3d4.jpg
+        2024-08-20_18-45-03_a1b2c3d4.xmp   # sidecar
+    Apple iPhone 15 Pro (video)/
+      2024-12-25/
+        2024-12-25_10-00-15_e5f6g7h8.mp4
   2025/
     ...
-  undated/            # freeform, not validated; for files with no year
 ```
 
 Naming conventions:
 
 - **Year dirs** — `YYYY`
-- **Device dirs** — `<Make> <Model> (<type>)` where type is `image`, `video`, or `audio`
+- **Device dirs** — `<Make> <Model> (<type>)` where type is `image`, `video`, or `audio`;
+  the name is canonical (see below)
 - **Date dirs** — `YYYY-MM-DD`
 - **Filenames** — `YYYY-MM-DD_HH-MM-SS_<hash>.<ext>`
 - **Sidecars** (`.xmp`, `.yaml`, `.json`) — placed next to their primary file
-- **Extensions** — always lowercase inside `sources/`
+- **Extensions** — always lowercase
 
-Files with no EXIF make/model go to `Unknown (<type>)/`. Videos get separate device dirs by default.
+The root holds only year dirs; a year holds only device dirs and `.imv/`. Anything else
+is reported by `verify`.
 
-Use `undated/` at the vault root for files with no usable year, or that you don't want filed by year. Freeform inside, not validated. Optional — only created when you need it.
+Device names are canonical and a pure function of EXIF make + model: the make's spelling
+is normalized (`SONY` → `Sony`), a make repeated in the model is dropped
+(`Canon Canon EOS 5D` → `Canon EOS 5D`), a missing make is taken from the model
+(`Canon EOS 550D` video with no Make), and model codes get market names
+(`ILCE-6300` → `a6300`, `FC2103` → `Mavic Air`). The tables live in
+`internal/defaults/defaults.go`. Files with no make at all go to `Unknown (<type>)/`.
+Videos get separate device dirs by default.
+
+Files with no EXIF date are not imported — they are counted as `No date` and left in place.
 
 ## Commands
 
@@ -81,6 +90,8 @@ imv import <source-path> [flags]
 | `--no-verify` | Skip hash verification of existing files |
 | `--no-randomize` | Import in directory order |
 | `--hash-algo` | `md5` (default) or `sha256` |
+
+Files with no EXIF date are skipped (`No date` in the summary) and stay where they are.
 
 ### verify
 
@@ -115,8 +126,12 @@ imv tools ext-count <dir>           # Tree of per-dir file extension counts
 Library-aware maintenance commands. Run from the library root.
 
 ```bash
-imv lib-tools normalize-ext         # Lowercase extensions in <year>/sources/
+imv lib-tools normalize-ext         # Lowercase extensions inside device dirs
+imv lib-tools migrate-layout        # One-off: old sources/ layout → current layout
 ```
+
+#### normalize-ext
+
 
 | Flag | Description |
 |------|-------------|
@@ -124,10 +139,26 @@ imv lib-tools normalize-ext         # Lowercase extensions in <year>/sources/
 | `--dry-run` | Show what would be renamed without modifying files |
 | `--no-fail-fast` | Continue on errors |
 
-Walks `<year>/sources/` subtrees only. Skips `sources-manual/`,
-`processed/`, `undated/`, and the library root itself. Pure case fixup
-— no hashing, no exiftool. After running, the next `verify` will
-re-verify renamed files once (cache miss) and re-cache them.
+Walks `<year>/<device>/` subtrees only. Skips hidden dirs (`.imv/`) and loose
+files outside device dirs. Pure case fixup — no hashing, no exiftool. After
+running, the next `verify` will re-verify renamed files once (cache miss) and
+re-cache them.
+
+#### migrate-layout
+
+| Flag | Description |
+|------|-------------|
+| `--year YYYY` | Only migrate this year |
+| `--dry-run` | Print the plan without changing anything |
+
+For vaults in the old layout (`<year>/sources/…`, `sources-manual/`, `processed/`,
+root `undated/`). Lifts device dirs out of `sources/`, renames them to canonical
+names (merging dirs that map to the same name; a file already present at the
+target is a conflict and stops that year), and rewrites each year's verify cache
+so the next `verify` is still served from cache. Refuses to run while
+`sources-manual/`, `processed/` or `undated/` exist — move them out of the vault
+first. No hashing, no exiftool; run `imv verify --no-cache` afterwards to confirm
+EXIF agrees with every new path.
 
 ### version
 

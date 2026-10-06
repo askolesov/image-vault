@@ -75,6 +75,7 @@ func newImportCmd() *cobra.Command {
 				{Label: "Skipped", Value: logging.FormatNumber(result.Skipped)},
 				{Label: "Replaced", Value: logging.FormatNumber(result.Replaced)},
 				{Label: "Dropped", Value: logging.FormatNumber(result.Dropped)},
+				{Label: "No date", Value: logging.FormatNumber(result.NoDate)},
 				{Label: "Errors", Value: logging.FormatNumber(result.Errors)},
 				{Label: "Processed", Value: logging.FormatBytes(result.ProcessedBytes)},
 			})

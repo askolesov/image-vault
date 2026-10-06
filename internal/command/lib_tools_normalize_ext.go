@@ -18,11 +18,10 @@ func newLibToolsNormalizeExtCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "normalize-ext",
-		Short: "Lowercase file extensions in <year>/sources/ subtrees",
-		Long: `Walks <year>/sources/ subtrees in the current library and renames any file
-whose extension is not already lowercase. Pure case fixup — no hashing,
-no exiftool. Skips sources-manual/, processed/, undated/, and the
-library root itself.`,
+		Short: "Lowercase file extensions inside device dirs",
+		Long: `Walks the <year>/<device>/ subtrees of the current library and renames any
+file whose extension is not already lowercase. Pure case fixup — no hashing,
+no exiftool. Skips hidden dirs (.imv/) and loose files outside device dirs.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			libraryPath, err := os.Getwd()

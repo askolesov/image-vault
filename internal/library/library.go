@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/askolesov/image-vault/internal/defaults"
 )
@@ -64,21 +65,20 @@ type ListSourceFilesProgress struct {
 // during the walk.
 const listSourceFilesProgressInterval = 100
 
-// ListSourceFiles walks <yearDir>/sources/ recursively and returns all file paths (not dirs).
-// Skips permission errors. Returns nil if sources/ doesn't exist.
+// ListSourceFiles walks <yearDir> recursively and returns all file paths (not
+// dirs) under its device directories. Hidden directories (the .imv/ cache dir)
+// and loose files in yearDir itself are skipped. Skips permission errors. Returns nil if yearDir doesn't exist.
 //
 // If p.OnScan is non-nil it is invoked every listSourceFilesProgressInterval
 // directories with running totals, and once more at the end with the final
-// tally. OnScan is not called when sources/ doesn't exist.
+// tally. OnScan is not called when yearDir doesn't exist.
 func ListSourceFiles(yearDir string, p ListSourceFilesProgress) ([]string, error) {
-	sourcesDir := filepath.Join(yearDir, "sources")
-
-	info, err := os.Stat(sourcesDir)
+	info, err := os.Stat(yearDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("stat sources dir: %w", err)
+		return nil, fmt.Errorf("stat year dir: %w", err)
 	}
 	if !info.IsDir() {
 		return nil, nil
@@ -89,7 +89,7 @@ func ListSourceFiles(yearDir string, p ListSourceFilesProgress) ([]string, error
 		dirs      int
 		fileCount int
 	)
-	err = filepath.WalkDir(sourcesDir, func(path string, d os.DirEntry, err error) error {
+	err = filepath.WalkDir(yearDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			if os.IsPermission(err) {
 				return nil
@@ -97,10 +97,17 @@ func ListSourceFiles(yearDir string, p ListSourceFilesProgress) ([]string, error
 			return err
 		}
 		if d.IsDir() {
+			if path != yearDir && strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir
+			}
 			dirs++
 			if p.OnScan != nil && dirs%listSourceFilesProgressInterval == 0 {
 				p.OnScan(dirs, fileCount)
 			}
+			return nil
+		}
+		if filepath.Dir(path) == yearDir {
+			// A loose file in the year dir is a structure problem, not a source file.
 			return nil
 		}
 		files = append(files, path)
@@ -108,7 +115,7 @@ func ListSourceFiles(yearDir string, p ListSourceFilesProgress) ([]string, error
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("walking sources: %w", err)
+		return nil, fmt.Errorf("walking year dir: %w", err)
 	}
 
 	if p.OnScan != nil {
@@ -116,29 +123,6 @@ func ListSourceFiles(yearDir string, p ListSourceFilesProgress) ([]string, error
 	}
 
 	return files, nil
-}
-
-// ListProcessedDirs reads <yearDir>/processed/ and returns sorted directory names only (not files).
-// Returns nil if processed/ doesn't exist.
-func ListProcessedDirs(yearDir string) ([]string, error) {
-	processedDir := filepath.Join(yearDir, "processed")
-
-	entries, err := os.ReadDir(processedDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("reading processed dir: %w", err)
-	}
-
-	var dirs []string
-	for _, e := range entries {
-		if e.IsDir() {
-			dirs = append(dirs, e.Name())
-		}
-	}
-	sort.Strings(dirs)
-	return dirs, nil
 }
 
 // RemoveEmptyDirsProgress reports progress during RemoveEmptyDirs.

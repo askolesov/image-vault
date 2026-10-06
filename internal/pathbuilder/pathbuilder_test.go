@@ -28,7 +28,7 @@ func TestBuildSourcePath(t *testing.T) {
 				Extension: ".jpg",
 			},
 			opts:     Options{SeparateVideo: true},
-			expected: "2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.jpg",
+			expected: "2024/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.jpg",
 		},
 		{
 			name: "video separate",
@@ -41,7 +41,7 @@ func TestBuildSourcePath(t *testing.T) {
 				Extension: ".mp4",
 			},
 			opts:     Options{SeparateVideo: true},
-			expected: "2024/sources/Apple iPhone 15 Pro (video)/2024-08-20/2024-08-20_18-45-03_d4e5f6a7.mp4",
+			expected: "2024/Apple iPhone 15 Pro (video)/2024-08-20/2024-08-20_18-45-03_d4e5f6a7.mp4",
 		},
 		{
 			name: "video not separate",
@@ -54,7 +54,7 @@ func TestBuildSourcePath(t *testing.T) {
 				Extension: ".mp4",
 			},
 			opts:     Options{SeparateVideo: false},
-			expected: "2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_d4e5f6a7.mp4",
+			expected: "2024/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_d4e5f6a7.mp4",
 		},
 		{
 			name: "unknown make no model",
@@ -67,7 +67,7 @@ func TestBuildSourcePath(t *testing.T) {
 				Extension: ".jpg",
 			},
 			opts:     Options{},
-			expected: "2025/sources/Unknown (image)/2025-03-15/2025-03-15_10-30-00_abcd1234.jpg",
+			expected: "2025/Unknown (image)/2025-03-15/2025-03-15_10-30-00_abcd1234.jpg",
 		},
 		{
 			name: "audio file",
@@ -80,7 +80,7 @@ func TestBuildSourcePath(t *testing.T) {
 				Extension: ".wav",
 			},
 			opts:     Options{SeparateVideo: true},
-			expected: "2024/sources/Zoom H6 (audio)/2024-05-10/2024-05-10_14-20-00_ff001122.wav",
+			expected: "2024/Zoom H6 (audio)/2024-05-10/2024-05-10_14-20-00_ff001122.wav",
 		},
 		{
 			name: "make with no model",
@@ -93,7 +93,7 @@ func TestBuildSourcePath(t *testing.T) {
 				Extension: ".arw",
 			},
 			opts:     Options{},
-			expected: "2024/sources/Sony (image)/2024-01-01/2024-01-01_00-00-00_11223344.arw",
+			expected: "2024/Sony (image)/2024-01-01/2024-01-01_00-00-00_11223344.arw",
 		},
 	}
 
@@ -106,16 +106,16 @@ func TestBuildSourcePath(t *testing.T) {
 }
 
 func TestBuildSidecarPath(t *testing.T) {
-	result := BuildSidecarPath("2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.jpg", ".xmp")
-	assert.Equal(t, "2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.xmp", result)
+	result := BuildSidecarPath("2024/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.jpg", ".xmp")
+	assert.Equal(t, "2024/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.xmp", result)
 }
 
 func TestBuildSidecarPath_LowercasesUppercaseExt(t *testing.T) {
 	// Defensive contract: callers may pass through filepath.Ext on a raw
 	// source path (e.g. ".XMP" from "IMG.XMP"). The built path must still
 	// be lowercase.
-	result := BuildSidecarPath("2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.jpg", ".XMP")
-	assert.Equal(t, "2024/sources/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.xmp", result)
+	result := BuildSidecarPath("2024/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.jpg", ".XMP")
+	assert.Equal(t, "2024/Apple iPhone 15 Pro (image)/2024-08-20/2024-08-20_18-45-03_a1b2c3d4.xmp", result)
 }
 
 func TestBuildSourceFilename(t *testing.T) {
@@ -160,6 +160,27 @@ func TestDeviceDir(t *testing.T) {
 			mediaType: defaults.MediaTypeAudio,
 			expected:  "Zoom H6 (audio)",
 		},
+		{
+			name:      "canonical name: make repeated in model",
+			make_:     "Canon",
+			model:     "Canon EOS 5D",
+			mediaType: defaults.MediaTypePhoto,
+			expected:  "Canon EOS 5D (image)",
+		},
+		{
+			name:      "canonical name: market name for a code",
+			make_:     "SONY",
+			model:     "ILCE-6300",
+			mediaType: defaults.MediaTypeVideo,
+			expected:  "Sony a6300 (video)",
+		},
+		{
+			name:      "canonical name: make taken from model",
+			make_:     "Unknown",
+			model:     "Canon EOS 550D",
+			mediaType: defaults.MediaTypeVideo,
+			expected:  "Canon EOS 550D (video)",
+		},
 	}
 
 	for _, tt := range tests {
@@ -169,7 +190,6 @@ func TestDeviceDir(t *testing.T) {
 		})
 	}
 }
-
 
 func TestParseSourceFilename(t *testing.T) {
 	tests := []struct {

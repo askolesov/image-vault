@@ -40,6 +40,7 @@ type Result struct {
 	Skipped        int
 	Replaced       int
 	Dropped        int
+	NoDate         int // no usable EXIF date — left in place, not imported
 	Errors         int
 	ProcessedBytes int64
 }
@@ -118,6 +119,13 @@ func (imp *Importer) importFile(g fileWithSidecars, result *Result) error {
 	// Drop non-media files unless KeepAll
 	if md.MediaType == defaults.MediaTypeOther && !imp.cfg.KeepAll {
 		result.Dropped++
+		return nil
+	}
+
+	// No date → not EXIF-fileable; leave it where it is
+	if md.DateTime.IsZero() {
+		result.NoDate++
+		imp.logger.Warn("no date, not imported: %s", g.Path)
 		return nil
 	}
 
