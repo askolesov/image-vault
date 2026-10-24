@@ -148,9 +148,10 @@ var makeAliases = map[string]string{
 // marketNames maps "<canonical make> <model>" to the model's market name,
 // for cameras whose EXIF model is a code.
 var marketNames = map[string]string{
-	"DJI FC2103":     "Mavic Air",
-	"DJI OP-041":     "OsmoPocket4",
-	"Sony ILCE-6300": "a6300",
+	"DJI FC2103":        "Mavic Air",
+	"DJI OP-041":        "OsmoPocket4",
+	"Sony ILCE-6300":    "a6300",
+	"Samsung GT-I9301I": "Galaxy S3 Neo",
 }
 
 // DeviceName returns the canonical "<Make> <Model>" name of a camera, used as
