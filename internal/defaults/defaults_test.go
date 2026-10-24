@@ -96,6 +96,7 @@ func TestDeviceName(t *testing.T) {
 		{"make from model when empty", "", "Canon EOS 550D", "Canon EOS 550D"},
 		{"dji code to market name", "DJI", "FC2103", "DJI Mavic Air"},
 		{"osmo pocket 4 code to market name", "DJI", "OP-041", "DJI OsmoPocket4"},
+		{"galaxy s3 neo code to market name", "SAMSUNG", "GT-I9301I", "Samsung Galaxy S3 Neo"},
 		{"apple unchanged", "Apple", "iPhone 13", "Apple iPhone 13"},
 		{"multi-word make alias", "NIKON CORPORATION", "NIKON D70", "Nikon D70"},
 		{"unknown make kept as written", "Acme Cam", "X1", "Acme Cam X1"},
